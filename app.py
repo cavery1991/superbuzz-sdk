@@ -123,7 +123,15 @@ if uploaded is None:
 
 # ── Load & validate ──
 
-df = pd.read_csv(uploaded)
+try:
+    df = pd.read_csv(uploaded)
+except UnicodeDecodeError:
+    uploaded.seek(0)
+    try:
+        df = pd.read_csv(uploaded, encoding="utf-16")
+    except Exception:
+        uploaded.seek(0)
+        df = pd.read_csv(uploaded, encoding="latin-1")
 df = normalize_columns(df)
 
 # Check required columns
