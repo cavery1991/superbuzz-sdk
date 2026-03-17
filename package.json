@@ -1,0 +1,22 @@
+{
+  "name": "superbuzz-sdk",
+  "version": "1.0.0",
+  "description": "SuperBuzz SDK - Search query mining, PMax segmentation, and search term triage tools for Google Ads optimization",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --config jest.config.js",
+    "lint": "eslint src/"
+  },
+  "keywords": ["google-ads", "ppc", "search-query-mining", "pmax", "campaign-optimization"],
+  "author": "cavery1991",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.3.0"
+  }
+}
