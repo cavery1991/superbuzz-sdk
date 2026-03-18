@@ -73,7 +73,7 @@ with st.sidebar:
     st.info(ANALYSIS_DESCRIPTIONS[analysis])
 
     st.divider()
-    st.markdown("**Required CSV columns:**")
+    st.markdown("**Required columns:**")
     for col in REQUIRED[analysis]:
         st.code(col, language=None)
 
@@ -84,14 +84,14 @@ with st.sidebar:
     )
 
 # Main area
-uploaded = st.file_uploader("Upload your CSV", type=["csv"])
+uploaded = st.file_uploader("Upload your CSV or Excel file", type=["csv", "xlsx"])
 
 if uploaded is None:
     # Show sample data hint
     st.markdown("---")
     st.markdown("### Getting started")
     st.markdown(
-        "Export a **Search Terms report** or **Products report** from Google Ads as CSV, then upload it above.\n\n"
+        "Export a **Search Terms report** or **Products report** from Google Ads as CSV or Excel, then upload it above.\n\n"
         "Your CSV needs at minimum these columns (names are flexible — common Google Ads export names work):"
     )
 
@@ -123,15 +123,18 @@ if uploaded is None:
 
 # ── Load & validate ──
 
-try:
-    df = pd.read_csv(uploaded)
-except UnicodeDecodeError:
-    uploaded.seek(0)
+if uploaded.name.endswith(".xlsx"):
+    df = pd.read_excel(uploaded)
+else:
     try:
-        df = pd.read_csv(uploaded, encoding="utf-16")
-    except Exception:
+        df = pd.read_csv(uploaded, on_bad_lines="skip")
+    except UnicodeDecodeError:
         uploaded.seek(0)
-        df = pd.read_csv(uploaded, encoding="latin-1")
+        try:
+            df = pd.read_csv(uploaded, encoding="utf-16", on_bad_lines="skip")
+        except Exception:
+            uploaded.seek(0)
+            df = pd.read_csv(uploaded, encoding="latin-1", on_bad_lines="skip")
 df = normalize_columns(df)
 
 # Check required columns
