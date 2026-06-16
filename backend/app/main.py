@@ -5,12 +5,15 @@ eCommerce PPC analytics decision-support system.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 import random
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -381,26 +384,27 @@ def health_check():
     return {"status": "healthy", "service": settings.app_name}
 
 
-@app.get("/")
-def root():
-    """Root endpoint returning app info."""
-    return {
-        "name": settings.app_name,
-        "version": "1.0.0",
-        "description": "eCommerce PPC analytics decision-support system",
-        "docs_url": "/docs",
-        "health_url": "/health",
-        "api_prefix": "/api/v1",
-        "endpoints": {
-            "campaigns": "/api/v1/campaigns",
-            "metrics": "/api/v1/metrics",
-            "search_terms": "/api/v1/search-terms",
-            "incrementality": "/api/v1/incrementality",
-            "causation": "/api/v1/causation",
-            "patterns": "/api/v1/patterns",
-            "insights": "/api/v1/insights",
-            "recommendations": "/api/v1/recommendations",
-            "simulator": "/api/v1/simulator",
-            "admin": "/api/v1/admin",
-        },
-    }
+# ── Serve Frontend Static Files ──
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(request: Request, full_path: str):
+        """Serve the React SPA for all non-API routes."""
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+else:
+    @app.get("/")
+    def root():
+        """Root endpoint returning app info."""
+        return {
+            "name": settings.app_name,
+            "version": "1.0.0",
+            "description": "eCommerce PPC analytics decision-support system",
+            "docs_url": "/docs",
+            "health_url": "/health",
+            "api_prefix": "/api/v1",
+        }
