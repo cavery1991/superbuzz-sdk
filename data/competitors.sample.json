@@ -1,0 +1,7 @@
+[
+  { "id": "c1", "title": "Alpine Waterproof Insulated Down Parka", "brand": "RivalCo", "price": 199.99, "categoryId": 5598, "attributes": { "color": "black", "material": "nylon" }, "inStock": true },
+  { "id": "c2", "title": "SpeedFlex Lightweight Running Sneakers Blue", "brand": "Adidas", "price": 109.99, "categoryId": 187, "attributes": { "color": "blue", "material": "mesh" }, "inStock": true },
+  { "id": "c3", "title": "QuietComfort Wireless Noise Cancelling Headphones", "brand": "Bose", "price": 279.0, "categoryId": 505762, "attributes": { "color": "black" }, "inStock": true },
+  { "id": "c4", "title": "Summit Pro Waterproof Hiking Boots Vibram Sole", "brand": "Salomon", "price": 149.99, "categoryId": 3237, "attributes": { "color": "brown", "material": "leather" }, "inStock": true },
+  { "id": "c5", "title": "Trail 20L Lightweight Hiking Backpack", "brand": "Osprey", "price": 89.99, "categoryId": 6552, "attributes": { "color": "green", "material": "nylon" }, "inStock": true }
+]

@@ -29,7 +29,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   createShoppingSystem, analyzeFeed, renderHtmlReport,
-  ingestSearchTerms, evaluate, calibrateThresholds, validateAgainstPerformance,
+  ingestSearchTerms, ingestFeed, buildProductProfile,
+  evaluate, calibrateThresholds, validateAgainstPerformance,
+  createGenerator, shareOfVoice, priceComparison,
+  CHANNELS, exportForChannel, missingRequiredFields, toTSV,
+  snapshot, diffSnapshots, detectAlerts,
 } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -244,6 +248,10 @@ function cmdAnalyze(positional, flags) {
       `(${signed(lift.coverageGain)} queries, ${signed(lift.valueCoverageGainPct)}% by value) · ` +
       `${lift.queriesFixed} queries newly fixed`,
   );
+  if (s.revenue) {
+    console.log(`Projected revenue from fixes: $${s.revenue.totalMonthly.toLocaleString()}/mo ($${s.revenue.totalAnnual.toLocaleString()}/yr)`);
+  }
+  console.log(`Risk: ${s.compliance.atRisk} product(s) may be disapproved · ${s.pricing.aboveMarket} priced above market`);
 
   console.log('\nTop opportunities (high-value queries not strongly covered):');
   console.log('  ✓ = a recommended fix would newly cover this query');
@@ -257,12 +265,18 @@ function cmdAnalyze(positional, flags) {
   console.log('\nPer-product fixes (worst feed score first):');
   console.log('─'.repeat(72));
   for (const p of report.products) {
-    console.log(`\n[${p.feedScore}/100] ${p.id} — "${p.title}"`);
+    const flags = [];
+    if (p.compliance?.willLikelyDisapprove) flags.push('⚠ DISAPPROVAL RISK');
+    if (p.price?.position === 'above') flags.push(`$ above market (${Math.round((p.price.ratioToMedian - 1) * 100)}%)`);
+    console.log(`\n[${p.feedScore}/100] ${p.id} — "${p.title}"${flags.length ? '  ' + flags.join(' · ') : ''}`);
     const sim = p.simulation;
     console.log(`   coverage ${sim.beforeCovered} → ${sim.afterCovered} of ${sim.relevantQueries} category queries ` +
       `(+${sim.newlyCovered} newly covered)`);
     for (const r of p.recommendations.slice(0, 5)) {
       console.log(`   [${r.priority}] ${r.message}`);
+    }
+    for (const c of (p.compliance?.issues ?? []).filter((i) => i.severity === 'disapproval').slice(0, 3)) {
+      console.log(`   [compliance] ${c.message}`);
     }
   }
   console.log('\nTip: add --search-terms data/search-terms.sample.csv to score against real queries.');
@@ -329,6 +343,133 @@ function cmdValidate(positional, flags) {
   }
 }
 
+async function cmdGenerate(positional, flags) {
+  const feedFile = positional[0] ?? (typeof flags.feed === 'string' ? flags.feed : DEFAULT_FEED);
+  const sys = createShoppingSystem();
+  const taxonomy = sys.taxonomy;
+  const items = ingestFeed(readFileSync(feedFile, 'utf8'), taxonomy);
+  const generator = createGenerator({
+    provider: typeof flags.provider === 'string' ? flags.provider : undefined,
+  });
+
+  console.log('='.repeat(72));
+  console.log(` Generated optimized feed content  (provider: ${generator.name})`);
+  console.log('='.repeat(72));
+
+  const out = [];
+  for (const it of items) {
+    const profile = buildProductProfile({
+      feed: it.product, schema: it.raw.schema,
+      visionTags: it.raw.visionTags, reviews: it.raw.reviews,
+    });
+    const stored = sys.engine.index({ ...it.product });
+    const content = await generator.generate({
+      raw: it.raw, product: stored, taxonomy, derivedTags: profile.derivedTags,
+    });
+
+    // Prove it helped: re-embed the generated copy and compare category coverage.
+    const beforeVec = stored.embedding;
+    const afterVec = sys.embedder.embed(`${content.title} ${content.description} ${taxonomy.get(stored.categoryId)?.parts.join(' ') ?? ''}`);
+    console.log(`\n${it.product.id}`);
+    console.log(`  before: "${it.raw.title ?? ''}"`);
+    console.log(`  after : "${content.title}"`);
+    console.log(`  desc  : ${content.description}`);
+    out.push({ ...it.raw, title: content.title, description: content.description });
+  }
+
+  if (flags.out && typeof flags.out === 'string') {
+    writeFileSync(flags.out, JSON.stringify(out, null, 2));
+    console.log(`\nOptimized feed written to ${flags.out}`);
+  } else {
+    console.log('\nTip: add --out optimized-feed.json to save the rewritten feed.');
+  }
+}
+
+function cmdCompete(positional, flags) {
+  const ourFile = typeof flags.data === 'string' ? flags.data : DEFAULT_DATA;
+  const compFile = positional[0] ?? (typeof flags.competitors === 'string' ? flags.competitors : null);
+  if (!compFile) return fail('compete needs a competitor feed: compete <competitors.json> [--data ours.json]');
+
+  const sys = createShoppingSystem();
+  const ours = JSON.parse(readFileSync(ourFile, 'utf8'));
+  const comp = JSON.parse(readFileSync(compFile, 'utf8'));
+  const ourIds = new Set(ours.map((p) => p.id));
+  const ourStored = sys.engine.indexAll(ours); // indexed → carry classified categoryId
+  const compStored = sys.engine.indexAll(comp.map((p, i) => ({ ...p, id: p.id ?? `comp-${i}` })));
+
+  const queries = JSON.parse(readFileSync(DEFAULT_JUDGMENTS, 'utf8')).map((j) => j.query);
+  const sov = shareOfVoice({ engine: sys.engine, queries, ownIds: ourIds, k: 3 });
+
+  console.log('='.repeat(72));
+  console.log(' Competitive analysis');
+  console.log('='.repeat(72));
+  console.log(`Share of voice (top-3 across ${queries.length} queries): ${(sov.overall * 100).toFixed(0)}%`);
+  console.log('\nQueries where a competitor takes the #1 spot:');
+  const losing = sov.perQuery.filter((x) => x.topIds[0] && !ourIds.has(x.topIds[0]));
+  if (losing.length === 0) console.log('  (none — you rank #1 everywhere)');
+  for (const q of losing.slice(0, 10)) {
+    console.log(`  ✗ "${q.query}"  → ${q.topIds[0]}`);
+  }
+  const prices = priceComparison({ ownProducts: ourStored, competitorProducts: compStored });
+  console.log('\nPrice position by category:');
+  for (const [cat, p] of prices) {
+    console.log(`  [${cat}] you ${p.ownMedian} vs market ${p.competitorMedian} → ${p.position}`);
+  }
+}
+
+function cmdChannels(positional, flags) {
+  const channel = positional[0];
+  if (!channel || !CHANNELS[channel]) {
+    return fail(`channels <${Object.keys(CHANNELS).join('|')}> [--data feed.json] [--out file.tsv]`);
+  }
+  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_DATA;
+  const sys = createShoppingSystem();
+  const products = sys.engine.indexAll(JSON.parse(readFileSync(dataFile, 'utf8')));
+  const records = exportForChannel(products, channel);
+  const tsv = toTSV(records);
+  if (typeof flags.out === 'string') {
+    writeFileSync(flags.out, tsv);
+    console.log(`Exported ${records.length} products for ${CHANNELS[channel].label} → ${flags.out}`);
+  } else {
+    console.log(tsv);
+  }
+  const incomplete = records.map((r, i) => ({ id: records[i].id ?? records[i].sku, missing: missingRequiredFields(r, channel) }))
+    .filter((x) => x.missing.length);
+  if (incomplete.length) {
+    console.error(`\n${incomplete.length} product(s) missing required ${channel} fields:`);
+    for (const x of incomplete.slice(0, 10)) console.error(`  ${x.id}: ${x.missing.join(', ')}`);
+  }
+}
+
+function cmdMonitor(positional, flags) {
+  const feedFile = typeof flags.feed === 'string' ? flags.feed : DEFAULT_FEED;
+  const stateFile = positional[0] ?? (typeof flags.state === 'string' ? flags.state : '/tmp/feed-snapshot.json');
+  const stFile = typeof flags['search-terms'] === 'string' ? flags['search-terms'] : null;
+  const report = analyzeFeed({
+    feed: readFileSync(feedFile, 'utf8'),
+    searchTermsCsv: stFile ? readFileSync(stFile, 'utf8') : undefined,
+  });
+  const next = snapshot(report);
+
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(stateFile, 'utf8')); } catch { /* first run */ }
+
+  if (!prev) {
+    writeFileSync(stateFile, JSON.stringify(next, null, 2));
+    console.log(`Baseline snapshot saved to ${stateFile}. Re-run after changes to detect regressions.`);
+    return;
+  }
+  const diff = diffSnapshots(prev, next);
+  const alerts = detectAlerts(diff);
+  console.log('='.repeat(72));
+  console.log(' Feed monitor');
+  console.log('='.repeat(72));
+  console.log(`Since ${prev.at}:  avg feed score ${signed(diff.avgFeedScoreChange)} · well-coverage ${signed(diff.coverageChange.well)}`);
+  if (alerts.length === 0) console.log('No regressions. ✓');
+  for (const a of alerts) console.log(`  [${a.level.toUpperCase()}] ${a.message}`);
+  writeFileSync(stateFile, JSON.stringify(next, null, 2));
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -348,12 +489,16 @@ Usage:
   shopping-graph taxonomy [<id|path>]
   shopping-graph index [<file.json>]
   shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>]
+  shopping-graph generate [<feed.json>] [--provider llm|template] [--out optimized.json]
+  shopping-graph compete <competitors.json> [--data ours.json]
+  shopping-graph channels <google|meta|amazon> [--data feed.json] [--out file.tsv]
+  shopping-graph monitor [<state.json>] [--feed feed.json] [--search-terms terms.csv]
   shopping-graph eval [<judgments.json>] [--data <catalog.json>] [--k N]
   shopping-graph validate [<terms.csv>] [--data <catalog.json>] [--metric conversions]
 `);
 }
 
-function main() {
+async function main() {
   const [, , cmd, ...rest] = process.argv;
   const { flags, positional } = parseFlags(rest);
   switch (cmd) {
@@ -364,6 +509,10 @@ function main() {
     case 'taxonomy': return cmdTaxonomy(positional);
     case 'index': return cmdIndex(positional, flags);
     case 'analyze': return cmdAnalyze(positional, flags);
+    case 'generate': return cmdGenerate(positional, flags);
+    case 'compete': return cmdCompete(positional, flags);
+    case 'channels': return cmdChannels(positional, flags);
+    case 'monitor': return cmdMonitor(positional, flags);
     case 'eval': return cmdEval(positional, flags);
     case 'validate': return cmdValidate(positional, flags);
     case undefined:
@@ -376,4 +525,7 @@ function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  console.error(`error: ${err.message}`);
+  process.exitCode = 1;
+});

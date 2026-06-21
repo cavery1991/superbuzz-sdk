@@ -20,13 +20,35 @@ sample data. The embedding provider is pluggable, so a real model
 ```bash
 node bin/cli.js analyze data/feed.sample.json \
   --search-terms data/search-terms.sample.csv \
-  --html feed-report.html                          # the feed-optimization report (+ HTML)
+  --html feed-report.html                          # full report: coverage, gaps, fixes,
+                                                    # lift, revenue $, price & disapproval risk
+node bin/cli.js generate                           # LLM/template-rewritten optimized feed copy
+node bin/cli.js compete data/competitors.sample.json   # share-of-voice + price position
+node bin/cli.js channels meta                      # syndicate the feed to another channel
+node bin/cli.js monitor                            # snapshot + regression alerts over time
 node bin/cli.js eval                               # retrieval metrics + threshold calibration
 node bin/cli.js validate                           # does coverage predict real performance?
 node bin/cli.js demo                               # engine walkthrough
-node bin/cli.js search "warm winter coat" --explain
-npm test                                           # 59 tests
+npm test                                           # 114 tests
 ```
+
+## Capability map
+
+| Capability | Module / command | What it adds |
+|---|---|---|
+| Feed audit + coverage/gap + simulated lift | `feed/analyzer` · `analyze` | the core report |
+| **LLM feed copywriting** (closes the loop) | `generate/feed-generator` · `generate` | rewrites titles/descriptions (LLM or offline template) to fill the gaps |
+| **Price competitiveness** | `pricing/price-intel` | flags items priced above market (a major ranking factor) |
+| **Revenue attribution** | `revenue/attribution` | projects $ from fixes so the list is prioritized by money, not coverage |
+| **Policy / disapproval risk** | `feed/compliance` | catches items that would be suppressed entirely |
+| **Competitive intelligence** | `competitive/competitive` · `compete` | share-of-voice, price position, title gaps vs rivals |
+| **Image audit** | `image/image-audit` | flags missing angles / low-res / no lifestyle shot (pluggable vision) |
+| **Demand & seasonality** | `demand/trends` | weights the query universe toward rising/in-season demand |
+| **Multi-channel syndication** | `channels/channels` · `channels` | export to Google / Meta / Amazon feed specs |
+| **Continuous monitoring** | `monitor/monitor` · `monitor` | snapshot + diff + regression alerts |
+| **Learned ranker** | `ranking/ranker` | logistic model blending semantic + price + quality + availability (CTR/convert seam) |
+| **Real embeddings** | `embeddings/factory` | OpenAI-compatible provider, offline fallback |
+| **Evaluation & validation** | `eval/evaluator` · `eval`/`validate` | precision/recall/NDCG, threshold calibration, performance back-test |
 
 ## The feed analysis tool (`analyze`)
 

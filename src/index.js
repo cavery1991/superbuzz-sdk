@@ -39,8 +39,18 @@ export { buildQueryUniverse } from './feed/query-universe.js';
 export { auditProduct } from './feed/auditor.js';
 export { optimizeProduct } from './feed/optimizer.js';
 export { analyzeFeed } from './feed/analyzer.js';
+export { checkCompliance } from './feed/compliance.js';
 export { renderHtmlReport } from './report/html-report.js';
 export { evaluate, calibrateThresholds, validateAgainstPerformance } from './eval/evaluator.js';
+export { buildPriceBenchmarks, priceCompetitiveness, priceFeature } from './pricing/price-intel.js';
+export { projectedRevenue, estimateOpportunities, summarizeRevenue } from './revenue/attribution.js';
+export { shareOfVoice, priceComparison, titleGaps } from './competitive/competitive.js';
+export { CHANNELS, exportForChannel, missingRequiredFields, toTSV } from './channels/channels.js';
+export { auditImages, parseImageList } from './image/image-audit.js';
+export { ingestTrends, demandMultiplier, applyDemandToUniverse, risingOpportunities } from './demand/trends.js';
+export { snapshot, diffSnapshots, detectAlerts } from './monitor/monitor.js';
+export { LearnedRanker, FEATURE_KEYS, DEFAULT_WEIGHTS as RANKER_WEIGHTS, sigmoid } from './ranking/ranker.js';
+export { TemplateGenerator, LLMGenerator, createGenerator } from './generate/feed-generator.js';
 
 /**
  * Wire up a complete, ready-to-use shopping system (synchronous; offline embedder).

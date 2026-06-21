@@ -21,7 +21,8 @@ export function renderHtmlReport(report, meta = {}) {
     card('Avg feed score', `${s.avgFeedScore}<span class="unit">/100</span>`, scoreClass(s.avgFeedScore)),
     card('Well-covered', `${s.coverage.well}<span class="unit">/${total}</span>`),
     card('Lift from fixes', `${signed(lift.coverageGain)}<span class="unit"> queries</span>`, lift.coverageGain > 0 ? 'good' : ''),
-    card('Queries fixable', lift.queriesFixed),
+    s.revenue ? card('Revenue opportunity', `$${Math.round(s.revenue.totalMonthly).toLocaleString()}<span class="unit">/mo</span>`, s.revenue.totalMonthly > 0 ? 'good' : '') : '',
+    s.compliance ? card('Disapproval risk', `${s.compliance.atRisk}<span class="unit"> products</span>`, s.compliance.atRisk > 0 ? 'bad' : 'good') : '',
   ].join('');
 
   const opportunities = report.gaps.slice(0, 20).map((g) => `
@@ -39,7 +40,9 @@ export function renderHtmlReport(report, meta = {}) {
         <div class="phead">
           <span class="badge ${scoreClass(p.feedScore)}">${p.feedScore}</span>
           <div>
-            <div class="ptitle">${esc(p.title || p.id)}</div>
+            <div class="ptitle">${esc(p.title || p.id)}
+              ${p.compliance?.willLikelyDisapprove ? '<span class="tag gap">disapproval risk</span>' : ''}
+              ${p.price?.position === 'above' ? `<span class="tag weak">+${Math.round((p.price.ratioToMedian - 1) * 100)}% vs market</span>` : ''}</div>
             <div class="pmeta">${esc(p.id)} · coverage ${p.simulation.beforeCovered} → <strong>${p.simulation.afterCovered}</strong>
               of ${p.simulation.relevantQueries} category queries (+${p.simulation.newlyCovered})</div>
           </div>
