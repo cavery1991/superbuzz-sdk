@@ -1,0 +1,33 @@
+{
+  "name": "shopping-graph",
+  "version": "0.1.0",
+  "description": "A Google Shopping-style product discovery system: Google Product Category taxonomy, semantic vector embeddings, and a Shopping Graph with semantic search.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "shopping-graph": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node bin/cli.js demo",
+    "start": "node bin/cli.js"
+  },
+  "keywords": [
+    "google-shopping",
+    "product-category-taxonomy",
+    "gpc",
+    "semantic-search",
+    "vector-embeddings",
+    "shopping-graph",
+    "ecommerce"
+  ],
+  "license": "MIT",
+  "files": [
+    "src",
+    "bin",
+    "data"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

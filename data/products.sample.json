@@ -1,0 +1,112 @@
+[
+  {
+    "id": "p1",
+    "title": "Summit Insulated Down Parka",
+    "description": "Heavyweight thermal parka with 700-fill down for subzero winter conditions.",
+    "brand": "NorthPeak",
+    "price": 249.99,
+    "attributes": { "color": "navy", "material": "nylon", "size": "M" },
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 1203
+  },
+  {
+    "id": "p2",
+    "title": "Cloudrunner Athletic Sneakers",
+    "description": "Lightweight mesh running shoes with responsive cushioning.",
+    "brand": "Nike",
+    "price": 119.99,
+    "attributes": { "color": "blue", "material": "mesh", "size": "10" },
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 890
+  },
+  {
+    "id": "p3",
+    "title": "Nike Air Trainer Low",
+    "description": "Classic blue gym trainers built for everyday performance.",
+    "brand": "Nike",
+    "price": 99.99,
+    "attributes": { "color": "blue", "material": "leather", "size": "9" },
+    "inStock": false,
+    "rating": 4.2,
+    "reviewCount": 540
+  },
+  {
+    "id": "p4",
+    "title": "Trailblaze Waterproof Hiking Boots",
+    "description": "Rugged, durable boots with waterproof leather for the outdoors.",
+    "brand": "Timberland",
+    "price": 159.99,
+    "attributes": { "color": "brown", "material": "leather", "size": "11" },
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 421
+  },
+  {
+    "id": "p5",
+    "title": "Aurora Wireless Noise Cancelling Headphones",
+    "description": "Over-ear bluetooth headphones with active noise cancellation and 30h battery.",
+    "brand": "Sony",
+    "price": 299.0,
+    "attributes": { "color": "black" },
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 3120
+  },
+  {
+    "id": "p6",
+    "title": "Pixel-style Flagship Smartphone",
+    "description": "Premium android handset with pro camera system.",
+    "brand": "Google",
+    "price": 799.0,
+    "attributes": { "color": "white" },
+    "inStock": true,
+    "rating": 4.4,
+    "reviewCount": 2210
+  },
+  {
+    "id": "p7",
+    "title": "FeatherLite Ultralight Mummy Sleeping Bag",
+    "description": "Lightweight down sleeping bag rated for cold-weather backpacking.",
+    "brand": "REI",
+    "price": 189.0,
+    "attributes": { "color": "green", "material": "nylon" },
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 318
+  },
+  {
+    "id": "p8",
+    "title": "ProChef Nonstick Ceramic Frying Pan",
+    "description": "Durable nonstick skillet with ceramic coating for everyday cooking.",
+    "brand": "Cuisinart",
+    "price": 49.99,
+    "attributes": { "color": "gray", "material": "ceramic" },
+    "inStock": true,
+    "rating": 4.3,
+    "reviewCount": 760
+  },
+  {
+    "id": "p9",
+    "title": "Everyday Daypack Backpack",
+    "description": "Lightweight 20L backpack with laptop sleeve for commuting and hiking.",
+    "brand": "Herschel",
+    "price": 69.99,
+    "attributes": { "color": "black", "material": "polyester" },
+    "inStock": true,
+    "rating": 4.4,
+    "reviewCount": 980
+  },
+  {
+    "id": "p10",
+    "title": "Fleece Pullover Hoodie",
+    "description": "Cozy warm fleece sweater for layering in cold weather.",
+    "brand": "Patagonia",
+    "price": 89.0,
+    "attributes": { "color": "gray", "material": "fleece", "size": "L" },
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 1450
+  }
+]

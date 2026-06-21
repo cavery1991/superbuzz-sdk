@@ -1,0 +1,136 @@
+[
+  {
+    "id": "p1",
+    "title": "Summit Down Parka",
+    "description": "700-fill down parka built for subzero conditions.",
+    "brand": "NorthPeak",
+    "price": 249.99,
+    "attributes": { "color": "navy", "material": "nylon", "size": "M" },
+    "inStock": true,
+    "reviews": [
+      { "text": "Kept me totally warm and cozy in freezing weather.", "rating": 5 },
+      { "text": "Stayed dry in a downpour, no leaks.", "rating": 5 },
+      { "text": "Lightweight but super warm.", "rating": 4 }
+    ],
+    "localInventory": { "US-CA": 12, "US-NY": 3 },
+    "pickupToday": true
+  },
+  {
+    "id": "p2",
+    "title": "Cloudrunner Sneakers",
+    "description": "Responsive cushioning for everyday miles.",
+    "brand": "Nike",
+    "price": 119.99,
+    "attributes": { "color": "blue", "material": "mesh", "size": "10" },
+    "inStock": true,
+    "visionTags": ["athletic", "lace-up", "low-top"],
+    "reviews": [
+      { "text": "Comfortable and true to size.", "rating": 5 },
+      { "text": "Great traction, didn't slip on wet pavement.", "rating": 4 }
+    ],
+    "localInventory": { "US-CA": 8 },
+    "pickupToday": true
+  },
+  {
+    "id": "p3",
+    "title": "Nike Air Trainer Low",
+    "description": "Classic blue gym trainers for everyday performance.",
+    "brand": "Nike",
+    "price": 99.99,
+    "attributes": { "color": "blue", "material": "leather", "size": "9" },
+    "inStock": false,
+    "rating": 4.2,
+    "reviewCount": 540
+  },
+  {
+    "id": "p4",
+    "title": "Trailblaze Hiking Boots",
+    "description": "Rugged leather boots for the outdoors.",
+    "brand": "Timberland",
+    "price": 159.99,
+    "attributes": { "color": "brown", "material": "leather", "size": "11" },
+    "inStock": true,
+    "reviews": [
+      { "text": "Grip is amazing, didn't slip on ice at all.", "rating": 5 },
+      { "text": "Kept my feet dry crossing streams.", "rating": 5 },
+      { "text": "Sturdy and durable, held up on rocky trails.", "rating": 4 }
+    ],
+    "localInventory": { "US-NY": 6 }
+  },
+  {
+    "id": "p5",
+    "title": "Aurora Over-Ear Headphones",
+    "description": "Active noise cancellation with 30h battery.",
+    "brand": "Sony",
+    "schema": {
+      "@type": "Product",
+      "name": "Aurora Over-Ear Headphones",
+      "brand": { "name": "Sony" },
+      "color": "black",
+      "offers": { "price": "299.00", "priceCurrency": "USD", "availability": "https://schema.org/InStock" },
+      "aggregateRating": { "ratingValue": 4.8, "reviewCount": 3120 }
+    },
+    "reviews": [
+      { "text": "Blocks out all the noise on flights, perfect for focus.", "rating": 5 },
+      { "text": "Battery lasts all day, wireless connection is solid.", "rating": 5 }
+    ],
+    "pickupToday": true,
+    "localInventory": { "US-CA": 20 }
+  },
+  {
+    "id": "p6",
+    "title": "Pixel-style Flagship Smartphone",
+    "description": "Premium android handset with pro camera system.",
+    "brand": "Google",
+    "price": 799.0,
+    "attributes": { "color": "white" },
+    "inStock": true,
+    "rating": 4.4,
+    "reviewCount": 2210
+  },
+  {
+    "id": "p7",
+    "title": "FeatherLite Mummy Sleeping Bag",
+    "description": "Ultralight down sleeping bag for cold-weather backpacking.",
+    "brand": "REI",
+    "price": 189.0,
+    "attributes": { "color": "green", "material": "nylon" },
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 318
+  },
+  {
+    "id": "p8",
+    "title": "ProChef Ceramic Frying Pan",
+    "description": "Nonstick skillet with ceramic coating for everyday cooking.",
+    "brand": "Cuisinart",
+    "price": 49.99,
+    "attributes": { "color": "gray", "material": "ceramic" },
+    "inStock": true,
+    "rating": 4.3,
+    "reviewCount": 760
+  },
+  {
+    "id": "p9",
+    "title": "Everyday Daypack",
+    "description": "20L pack with laptop sleeve for commuting and hiking.",
+    "brand": "Herschel",
+    "price": 69.99,
+    "attributes": { "color": "black", "material": "polyester" },
+    "inStock": true,
+    "visionTags": ["two-tone", "padded straps"],
+    "rating": 4.4,
+    "reviewCount": 980
+  },
+  {
+    "id": "p10",
+    "title": "Patagonia Pullover Hoodie",
+    "description": "Cozy warm fleece sweater for layering.",
+    "brand": "Patagonia",
+    "price": 89.0,
+    "attributes": { "color": "gray", "material": "fleece", "size": "L" },
+    "inStock": true,
+    "reviews": [{ "text": "So warm and cozy on cold mornings.", "rating": 5 }],
+    "localInventory": { "US-CA": 4 }
+  }
+]
