@@ -9,6 +9,11 @@
 
 import { cosineSimilarity } from '../embeddings/embedder.js';
 
+/** The text used to represent a taxonomy node for embedding (leaf emphasized). */
+export function categoryEmbedText(node) {
+  return `${node.parts.join(' ')} ${node.name} ${node.name}`;
+}
+
 export class CategoryClassifier {
   /**
    * @param {import('../taxonomy/taxonomy.js').Taxonomy} taxonomy
@@ -24,9 +29,7 @@ export class CategoryClassifier {
 
   _build() {
     for (const node of this.taxonomy.all()) {
-      // Embed the full path; deeper, leaf-ish words repeated for emphasis.
-      const text = `${node.parts.join(' ')} ${node.name} ${node.name}`;
-      this._index.push({ id: node.id, path: node.path, embedding: this.embedder.embed(text) });
+      this._index.push({ id: node.id, path: node.path, embedding: this.embedder.embed(categoryEmbedText(node)) });
     }
   }
 

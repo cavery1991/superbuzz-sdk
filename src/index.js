@@ -19,11 +19,14 @@
 import { Taxonomy } from './taxonomy/taxonomy.js';
 import { LocalEmbedder, Embedder, cosineSimilarity } from './embeddings/embedder.js';
 import { ShoppingGraph } from './graph/shopping-graph.js';
-import { CategoryClassifier } from './search/classifier.js';
+import { CategoryClassifier, categoryEmbedText } from './search/classifier.js';
 import { SearchEngine } from './search/search-engine.js';
+import { createEmbedder } from './embeddings/factory.js';
 
 export { Taxonomy } from './taxonomy/taxonomy.js';
 export { LocalEmbedder, Embedder, cosineSimilarity, tokenize } from './embeddings/embedder.js';
+export { RemoteEmbedder } from './embeddings/remote-embedder.js';
+export { createEmbedder } from './embeddings/factory.js';
 export { ShoppingGraph } from './graph/shopping-graph.js';
 export { CategoryClassifier } from './search/classifier.js';
 export { SearchEngine } from './search/search-engine.js';
@@ -36,9 +39,11 @@ export { buildQueryUniverse } from './feed/query-universe.js';
 export { auditProduct } from './feed/auditor.js';
 export { optimizeProduct } from './feed/optimizer.js';
 export { analyzeFeed } from './feed/analyzer.js';
+export { renderHtmlReport } from './report/html-report.js';
+export { evaluate, calibrateThresholds, validateAgainstPerformance } from './eval/evaluator.js';
 
 /**
- * Wire up a complete, ready-to-use shopping system.
+ * Wire up a complete, ready-to-use shopping system (synchronous; offline embedder).
  * @param {object} [opts]
  * @param {Taxonomy} [opts.taxonomy]  defaults to the bundled curated subset
  * @param {Embedder} [opts.embedder]  defaults to the offline LocalEmbedder
@@ -48,6 +53,23 @@ export { analyzeFeed } from './feed/analyzer.js';
 export function createShoppingSystem(opts = {}) {
   const taxonomy = opts.taxonomy ?? Taxonomy.sample();
   const embedder = opts.embedder ?? new LocalEmbedder();
+  const graph = new ShoppingGraph();
+  const engine = new SearchEngine({ taxonomy, embedder, graph, weights: opts.weights });
+  return { taxonomy, embedder, graph, classifier: engine.classifier, engine };
+}
+
+/**
+ * Async system builder that supports network-backed embedders. Selects the
+ * provider via {@link createEmbedder} (env-driven, falls back to local), warms
+ * the taxonomy category vectors, then builds the engine. Use the engine's
+ * `indexAllAsync` / `searchAsync` methods with the returned system.
+ * @param {object} [opts] same as createShoppingSystem, plus:
+ * @param {object} [opts.embedderOptions] forwarded to createEmbedder
+ */
+export async function createShoppingSystemAsync(opts = {}) {
+  const taxonomy = opts.taxonomy ?? Taxonomy.sample();
+  const embedder = opts.embedder ?? createEmbedder(opts.embedderOptions);
+  await embedder.warm(taxonomy.all().map(categoryEmbedText));
   const graph = new ShoppingGraph();
   const engine = new SearchEngine({ taxonomy, embedder, graph, weights: opts.weights });
   return { taxonomy, embedder, graph, classifier: engine.classifier, engine };

@@ -19,11 +19,13 @@ sample data. The embedding provider is pluggable, so a real model
 
 ```bash
 node bin/cli.js analyze data/feed.sample.json \
-  --search-terms data/search-terms.sample.csv   # the feed-optimization report
-node bin/cli.js demo                              # engine walkthrough
+  --search-terms data/search-terms.sample.csv \
+  --html feed-report.html                          # the feed-optimization report (+ HTML)
+node bin/cli.js eval                               # retrieval metrics + threshold calibration
+node bin/cli.js validate                           # does coverage predict real performance?
+node bin/cli.js demo                               # engine walkthrough
 node bin/cli.js search "warm winter coat" --explain
-node bin/cli.js parse "waterproof black running shoes size 10"
-npm test                                          # 48 tests
+npm test                                           # 59 tests
 ```
 
 ## The feed analysis tool (`analyze`)
@@ -84,6 +86,42 @@ const tax = Taxonomy.sample();             // or Taxonomy.fromFile('taxonomy.txt
 tax.get(187).path;                         // "...> Shoes > Athletic Shoes"
 tax.ancestors(187);                        // root → leaf chain
 ```
+
+### Real embedding models (pluggable)
+`src/embeddings/factory.js`, `remote-embedder.js`
+
+The offline `LocalEmbedder` is the default, but a real model drops in behind the
+same `Embedder` interface. `createEmbedder()` selects the provider from env:
+
+```bash
+EMBEDDINGS_PROVIDER=remote \
+EMBEDDINGS_API_URL=https://api.openai.com/v1/embeddings \
+EMBEDDINGS_API_KEY=sk-... \
+EMBEDDINGS_MODEL=text-embedding-3-small
+```
+
+`RemoteEmbedder` targets any OpenAI-compatible endpoint (OpenAI, Vertex's
+compatible layer, Voyage, or a self-hosted bge/e5 server). Because HTTP is async
+but the engine embeds synchronously, vectors are fetched in batches and cached
+via `warm()`; use `createShoppingSystemAsync()` and the engine's `indexAllAsync` /
+`searchAsync` methods. With no key configured it degrades gracefully to the local
+embedder. `fetchImpl` is injectable, so it's fully testable without a network.
+
+### Validation & evaluation
+`src/eval/evaluator.js`
+
+Turns "is it any good?" into measurement (`node bin/cli.js eval` / `validate`):
+
+- **`evaluate()`** — precision/recall/MRR/NDCG@k against labeled
+  `query → relevant-product` judgments (`data/relevance.sample.json`).
+- **`calibrateThresholds()`** — sweeps the cosine cutoff against those labels to
+  recommend data-driven `well`/`weak` coverage thresholds instead of constants.
+  (It already flagged that the analyzer's default `well: 0.45` is stricter than
+  the labeled data supports.)
+- **`validateAgainstPerformance()`** — the back-test: bucket real Search Terms by
+  predicted coverage and check whether better-covered queries actually earned more
+  (clicks/conversions). If "well" queries don't out-earn "gap" queries, the
+  coverage signal isn't predictive — and the harness tells you so.
 
 ### Pillar 2 — Semantic embeddings & cosine similarity
 `src/embeddings/`
@@ -203,10 +241,12 @@ src/
   search/        CategoryClassifier, SearchEngine — the operation tying it together
   feed/          analyzeFeed     — the merchant feed-optimization tool:
                    feed-ingest · query-universe · auditor · optimizer · analyzer
-  index.js       createShoppingSystem(...) + public exports
-bin/cli.js       analyze / demo / search / parse / classify / taxonomy / index
-data/            sample + enriched catalogs, sample feed + search-terms CSV
-test/            node:test suites for every module (48 tests)
+  report/        renderHtmlReport — standalone HTML report for the analysis
+  eval/          evaluate · calibrateThresholds · validateAgainstPerformance
+  index.js       createShoppingSystem(...) / createShoppingSystemAsync(...) + exports
+bin/cli.js       analyze / eval / validate / demo / search / parse / classify / taxonomy / index
+data/            catalogs, sample feed, search-terms CSV, relevance judgments
+test/            node:test suites for every module (59 tests)
 ```
 
 ## CLI reference

@@ -20,8 +20,16 @@
 import { CONCEPTS } from './concepts.js';
 
 /**
- * Provider interface. Any embedder exposes `dim` and `embed(text) -> Float64Array`.
- * Swap in a real model by implementing these two members.
+ * Provider interface.
+ *
+ * Synchronous core: `dim` + `embed(text) -> Float64Array`. The engine builds and
+ * queries synchronously, so `embed` must return immediately.
+ *
+ * Async providers (real API models) cannot fetch synchronously, so they also
+ * implement `warm(texts)` — pre-fetch and cache vectors — after which `embed`
+ * serves them from cache. Local providers inherit no-op defaults. The default
+ * `embedBatch` simply maps `embed`, which real providers override to batch.
+ *
  * @interface
  */
 export class Embedder {
@@ -31,6 +39,15 @@ export class Embedder {
   /** @param {string} _text @returns {Float64Array} */
   embed(_text) {
     throw new Error('not implemented');
+  }
+  /** Pre-fetch and cache vectors for `texts`. No-op for synchronous providers. */
+  async warm(_texts) {
+    /* no-op */
+  }
+  /** @param {string[]} texts @returns {Promise<Float64Array[]>} */
+  async embedBatch(texts) {
+    await this.warm(texts);
+    return texts.map((t) => this.embed(t));
   }
 }
 

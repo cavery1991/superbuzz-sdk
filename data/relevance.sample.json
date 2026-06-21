@@ -1,0 +1,14 @@
+[
+  { "query": "warm winter coat", "relevant": ["p1", "p10"] },
+  { "query": "insulated down parka", "relevant": ["p1"] },
+  { "query": "blue nike sneakers", "relevant": ["p2", "p3"] },
+  { "query": "running shoes", "relevant": ["p2", "p3"] },
+  { "query": "waterproof hiking boots", "relevant": ["p4"] },
+  { "query": "noise cancelling headphones", "relevant": ["p5"] },
+  { "query": "wireless headphones for travel", "relevant": ["p5"] },
+  { "query": "smartphone", "relevant": ["p6"] },
+  { "query": "sleeping bag for camping", "relevant": ["p7"] },
+  { "query": "nonstick frying pan", "relevant": ["p8"] },
+  { "query": "laptop backpack", "relevant": ["p9"] },
+  { "query": "cozy fleece hoodie", "relevant": ["p10"] }
+]

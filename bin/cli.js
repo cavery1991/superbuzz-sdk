@@ -24,14 +24,18 @@
  *   --explain        show score breakdown
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { createShoppingSystem, analyzeFeed } from '../src/index.js';
+import {
+  createShoppingSystem, analyzeFeed, renderHtmlReport,
+  ingestSearchTerms, evaluate, calibrateThresholds, validateAgainstPerformance,
+} from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DATA = resolve(__dirname, '../data/products.enriched.json');
 const DEFAULT_FEED = resolve(__dirname, '../data/feed.sample.json');
+const DEFAULT_JUDGMENTS = resolve(__dirname, '../data/relevance.sample.json');
 
 function loadProducts(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
@@ -217,6 +221,14 @@ function cmdAnalyze(positional, flags) {
   const report = analyzeFeed({ feed, searchTermsCsv });
   const s = report.summary;
 
+  // Optional HTML export.
+  if (flags.html) {
+    const out = typeof flags.html === 'string' ? flags.html : 'feed-report.html';
+    writeFileSync(out, renderHtmlReport(report, { feedFile, searchTermsFile: stFile }));
+    console.log(`HTML report written to ${out}`);
+    if (flags['html-only']) return;
+  }
+
   console.log('='.repeat(72));
   console.log(' Feed analysis report');
   console.log('='.repeat(72));
@@ -265,6 +277,58 @@ function signed(n) {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
+function cmdEval(positional, flags) {
+  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_DATA;
+  const judgmentsFile = positional[0] ?? (typeof flags.judgments === 'string' ? flags.judgments : DEFAULT_JUDGMENTS);
+  const k = flags.k ? Number(flags.k) : 5;
+
+  const sys = buildSystem(dataFile);
+  const judgments = JSON.parse(readFileSync(judgmentsFile, 'utf8'));
+
+  const m = evaluate(sys.engine, judgments, { k });
+  console.log('='.repeat(72));
+  console.log(` Retrieval quality (${m.queries} judged queries, k=${k})`);
+  console.log('='.repeat(72));
+  console.log(`  precision@${k}: ${m.precisionAtK}`);
+  console.log(`  recall@${k}:    ${m.recallAtK}`);
+  console.log(`  MRR:          ${m.mrr}`);
+  console.log(`  NDCG@${k}:      ${m.ndcgAtK}`);
+
+  const cal = calibrateThresholds(sys.engine, judgments);
+  console.log('\nThreshold calibration (vs labeled relevance):');
+  console.log(`  best F1 ${cal.best.f1} at cosine ≥ ${cal.best.t} (precision ${cal.best.precision}, recall ${cal.best.recall})`);
+  console.log(`  recommended thresholds → well: ${cal.recommended.well}  weak: ${cal.recommended.weak}`);
+  console.log('  (the analyzer currently uses well: 0.45, weak: 0.2)');
+
+  const worst = m.perQuery.filter((q) => q.precision === 0).map((q) => q.query);
+  if (worst.length) console.log(`\n  queries with no relevant hit in top ${k}: ${worst.join(', ')}`);
+}
+
+function cmdValidate(positional, flags) {
+  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_DATA;
+  const stFile = positional[0] ?? (typeof flags['search-terms'] === 'string' ? flags['search-terms']
+    : resolve(__dirname, '../data/search-terms.sample.csv'));
+  const metric = typeof flags.metric === 'string' ? flags.metric : 'conversions';
+
+  const sys = buildSystem(dataFile);
+  const searchTerms = ingestSearchTerms(readFileSync(stFile, 'utf8'));
+  const v = validateAgainstPerformance(sys.engine, searchTerms, { metric });
+
+  console.log('='.repeat(72));
+  console.log(' Validation: does predicted coverage track real performance?');
+  console.log('='.repeat(72));
+  console.log(`Metric: ${v.metric}  ·  queries: ${v.rows.length}`);
+  for (const b of ['well', 'weak', 'gap']) {
+    console.log(`  ${b.padEnd(5)}: ${String(v.summary[b].n).padStart(3)} queries · avg ${v.metric} ${v.summary[b].avgPerf}`);
+  }
+  console.log(`\n  correlation(coverage score, ${v.metric}): ${v.correlation}`);
+  console.log(`  hypothesis "better coverage → better performance": ${v.holds ? 'HOLDS ✓' : 'does NOT hold ✗'}`);
+  console.log('\n  Per-query:');
+  for (const r of v.rows.sort((a, b) => b.perf - a.perf).slice(0, 12)) {
+    console.log(`    [${r.bucket.padEnd(4)}] ${r.bestScore}  ${v.metric}=${r.perf}  "${r.query}"`);
+  }
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -283,7 +347,9 @@ Usage:
   shopping-graph classify "<text>" [--limit N]
   shopping-graph taxonomy [<id|path>]
   shopping-graph index [<file.json>]
-  shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>]
+  shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>]
+  shopping-graph eval [<judgments.json>] [--data <catalog.json>] [--k N]
+  shopping-graph validate [<terms.csv>] [--data <catalog.json>] [--metric conversions]
 `);
 }
 
@@ -298,6 +364,8 @@ function main() {
     case 'taxonomy': return cmdTaxonomy(positional);
     case 'index': return cmdIndex(positional, flags);
     case 'analyze': return cmdAnalyze(positional, flags);
+    case 'eval': return cmdEval(positional, flags);
+    case 'validate': return cmdValidate(positional, flags);
     case undefined:
     case 'help':
     case '--help':

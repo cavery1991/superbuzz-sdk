@@ -62,10 +62,44 @@ export class SearchEngine {
    * @param {import('../graph/shopping-graph.js').Product} product
    */
   index(product) {
+    const prep = this._prepare(product);
+    const categoryId = prep.base.categoryId ?? this.classifier.bestCategoryId(prep.classifyText);
+    const stored = this.graph.upsert({ ...prep.base, categoryId });
+    stored.embedding = this.embedder.embed(this._finalText(stored, prep));
+    return stored;
+  }
+
+  indexAll(products) {
+    return products.map((p) => this.index(p));
+  }
+
+  /**
+   * Async indexing for providers that fetch embeddings over the network. Warms
+   * the embedder cache in two passes (classification inputs, then final texts)
+   * so the synchronous core can run against cached vectors.
+   */
+  async indexAllAsync(products) {
+    const preps = products.map((p) => ({ p, ...this._prepare(p) }));
+
+    // Pass 1: classify products lacking a category.
+    await this.embedder.warm(preps.filter((x) => x.base.categoryId == null).map((x) => x.classifyText));
+    const finals = preps.map((x) => {
+      const categoryId = x.base.categoryId ?? this.classifier.bestCategoryId(x.classifyText);
+      const stored = this.graph.upsert({ ...x.base, categoryId });
+      return { stored, text: this._finalText(stored, x) };
+    });
+
+    // Pass 2: embed final representations.
+    await this.embedder.warm(finals.map((f) => f.text));
+    for (const f of finals) f.stored.embedding = this.embedder.embed(f.text);
+    return finals.map((f) => f.stored);
+  }
+
+  /** Decompose a product into the base record + the texts used to embed it. */
+  _prepare(product) {
     let base = product;
     let enriched = null;
     let derivedConcepts = [];
-
     if (product.schema || product.visionTags || product.reviews) {
       const profile = buildProductProfile({
         feed: stripProfileInputs(product),
@@ -77,24 +111,17 @@ export class SearchEngine {
       enriched = profile.enrichedText;
       derivedConcepts = profile.derivedConcepts;
     }
+    return { base, enriched, derivedConcepts, classifyText: productText(base, this.taxonomy) };
+  }
 
-    const categoryId =
-      base.categoryId ?? this.classifier.bestCategoryId(productText(base, this.taxonomy));
-    const stored = this.graph.upsert({ ...base, categoryId });
-
-    const text = [
-      enriched ?? productText(stored, this.taxonomy),
+  _finalText(stored, prep) {
+    return [
+      prep.enriched ?? productText(stored, this.taxonomy),
       categoryPathText(stored, this.taxonomy),
-      ...derivedConcepts.map(conceptTerm),
+      ...prep.derivedConcepts.map(conceptTerm),
     ]
       .filter(Boolean)
       .join(' ');
-    stored.embedding = this.embedder.embed(text);
-    return stored;
-  }
-
-  indexAll(products) {
-    return products.map((p) => this.index(p));
   }
 
   /**
@@ -203,6 +230,17 @@ export class SearchEngine {
       },
       results: results.slice(0, limit),
     };
+  }
+
+  /**
+   * Async search for network-backed embedders: warm the query texts (raw query
+   * for category inference + the intent-expanded text) then run sync `search`.
+   */
+  async searchAsync(query, opts = {}) {
+    await this.embedder.warm([query]);
+    const parsed = this.parser.parse(query); // sync; embed(query) now cached
+    await this.embedder.warm([parsed.semanticText]);
+    return this.search(query, opts);
   }
 }
 
