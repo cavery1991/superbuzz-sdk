@@ -1,20 +1,71 @@
 # Shopping Graph
 
-A compact, self-contained implementation of the system behind **Google Shopping**:
-the Google Product Category taxonomy ("the number system"), semantic vector
-embeddings with cosine similarity, a Shopping Graph product store, query factor
-extraction, multi-source product profiles, and real-time contextual re-ranking.
+A **Google Shopping feed analysis & optimization tool**, built on a self-contained
+simulation of how Google Shopping matches queries to products: the Google Product
+Category taxonomy ("the number system"), semantic vector embeddings with cosine
+similarity, a Shopping Graph product store, query factor extraction, multi-source
+product profiles, and real-time contextual re-ranking.
 
-It runs entirely offline (no API keys) and ships with a CLI, a test suite, and a
-sample catalog. The embedding provider is pluggable, so a real model
+The headline use case (`analyze`) takes a merchant's product feed — and optionally
+their real Google Ads Search Terms report — and produces a single report covering:
+**coverage** (what the catalog matches today), **gaps/opportunities** (high-value
+queries it misses), **per-product feed fixes**, and the **simulated lift** each fix
+would deliver. The semantic engine acts as a "Google's brain" simulator, so it
+works with zero Google account access and gets sharper when real query data is fed in.
+
+It runs entirely offline (no API keys) and ships with a CLI, a test suite, and
+sample data. The embedding provider is pluggable, so a real model
 (Vertex AI / MUM / BERT-style) can be swapped in without touching callers.
 
 ```bash
-node bin/cli.js demo                 # end-to-end walkthrough
+node bin/cli.js analyze data/feed.sample.json \
+  --search-terms data/search-terms.sample.csv   # the feed-optimization report
+node bin/cli.js demo                              # engine walkthrough
 node bin/cli.js search "warm winter coat" --explain
 node bin/cli.js parse "waterproof black running shoes size 10"
-npm test                             # 38 tests
+npm test                                          # 48 tests
 ```
+
+## The feed analysis tool (`analyze`)
+
+```
+node bin/cli.js analyze <feed.json> [--search-terms <report.csv>]
+```
+
+Pipeline (`src/feed/`):
+
+1. **Ingest** (`feed-ingest.js`) — read the feed in the real Merchant Center /
+   Content API spec (JSON or TSV), and optionally a Google Ads Search Terms CSV.
+2. **Query universe** (`query-universe.js`) — the searches to evaluate against.
+   Real Search Terms rows (weighted by conversions/clicks/impressions) merge with
+   queries auto-generated from each category × the attributes/brands in the catalog,
+   so the tool works with or without Google data.
+3. **Audit** (`auditor.js`) — per-product feed score (0-100) flagging missing
+   required/recommended attributes, weak titles, missing/incorrect GPC, and
+   review/image signals not surfaced in the text.
+4. **Optimize** (`optimizer.js`) — concrete, ranked recommendations and an
+   *optimized representation* (enriched title + corrected GPC + folded-in
+   attributes and review signals).
+5. **Analyze + simulate** (`analyzer.js`) — score coverage **before vs. after**
+   applying every recommendation, and report the lift.
+
+The differentiator is step 5: rather than just listing feed-hygiene issues like
+most tools, it **simulates the relevance impact** — "surfacing your boots' 'didn't
+slip on ice' reviews and adding the GPC would newly cover *waterproof boot*,
+*durable boot*, and *insulated down parka*." Coverage (queries matched above
+threshold), not raw cosine, is the headline metric, because adding terms to a
+normalized vector can lower peak similarity even while it matches *more* queries.
+
+### What feeds the simulation
+The engine indexes the feed and scores each universe query against each product
+with cosine similarity. The "after" representation is a strict superset of the
+current product text, so the simulated lift only ever reflects information *added*
+(attributes, category, surfaced reviews), never content removed.
+
+> **Real-data note:** the feed and the Search Terms CSV are real inputs. The
+> *which-queries-you-rank-for* signal is only fully accurate from Google's own
+> data (Search Terms report / Content API). Without it, the generated query
+> universe is an estimate — useful for direction, not a substitute for the report.
 
 ---
 
@@ -150,15 +201,18 @@ src/
   product/       buildProfile    — fuse feed + schema + vision + reviews
   ranking/       applyContext    — geo / device / co-purchase re-ranking
   search/        CategoryClassifier, SearchEngine — the operation tying it together
+  feed/          analyzeFeed     — the merchant feed-optimization tool:
+                   feed-ingest · query-universe · auditor · optimizer · analyzer
   index.js       createShoppingSystem(...) + public exports
-bin/cli.js       demo / search / parse / classify / taxonomy / index
-data/            sample + enriched product catalogs
-test/            node:test suites for every module
+bin/cli.js       analyze / demo / search / parse / classify / taxonomy / index
+data/            sample + enriched catalogs, sample feed + search-terms CSV
+test/            node:test suites for every module (48 tests)
 ```
 
 ## CLI reference
 
 ```
+shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>]
 shopping-graph demo
 shopping-graph search "<query>" [--limit N] [--in-stock] [--brand X]
                                 [--max-price N] [--min-rating N]

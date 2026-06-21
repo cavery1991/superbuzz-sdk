@@ -1,0 +1,94 @@
+[
+  {
+    "id": "SKU-1001",
+    "title": "Parka",
+    "description": "A warm jacket.",
+    "link": "https://store.example/p/1001",
+    "image_link": "https://store.example/img/1001.jpg",
+    "price": "249.99 USD",
+    "availability": "in_stock",
+    "brand": "NorthPeak",
+    "color": "navy",
+    "material": "nylon",
+    "size": "M",
+    "reviews": [
+      { "text": "Kept me totally warm and cozy in freezing weather.", "rating": 5 },
+      { "text": "Stayed dry in a downpour, no leaks.", "rating": 5 }
+    ]
+  },
+  {
+    "id": "SKU-1002",
+    "title": "Cloudrunner Athletic Running Sneakers - Blue Mesh - Size 10",
+    "description": "Lightweight blue mesh running shoes with responsive cushioning for everyday miles.",
+    "link": "https://store.example/p/1002",
+    "image_link": "https://store.example/img/1002.jpg",
+    "price": "119.99 USD",
+    "availability": "in_stock",
+    "brand": "Nike",
+    "google_product_category": "187",
+    "product_type": "Shoes > Running",
+    "color": "blue",
+    "material": "mesh",
+    "size": "10",
+    "gender": "unisex",
+    "age_group": "adult",
+    "reviews": [{ "text": "Comfortable and true to size, great traction.", "rating": 5 }]
+  },
+  {
+    "id": "SKU-1003",
+    "title": "Sony Headphones",
+    "description": "Over-ear headphones.",
+    "link": "https://store.example/p/1003",
+    "image_link": "https://store.example/img/1003.jpg",
+    "price": "299.00 USD",
+    "availability": "in_stock",
+    "brand": "Sony",
+    "google_product_category": "505762",
+    "color": "black",
+    "reviews": [
+      { "text": "Blocks out all the noise on flights, perfect for focus.", "rating": 5 },
+      { "text": "Battery lasts all day and the wireless connection is solid.", "rating": 5 }
+    ]
+  },
+  {
+    "id": "SKU-1004",
+    "title": "Hiking Boots",
+    "description": "Boots for outdoors.",
+    "link": "https://store.example/p/1004",
+    "image_link": "https://store.example/img/1004.jpg",
+    "price": "159.99 USD",
+    "availability": "in_stock",
+    "brand": "Timberland",
+    "color": "brown",
+    "material": "leather",
+    "reviews": [
+      { "text": "Grip is amazing, didn't slip on ice at all.", "rating": 5 },
+      { "text": "Kept my feet dry crossing streams, very durable.", "rating": 5 }
+    ]
+  },
+  {
+    "id": "SKU-1005",
+    "title": "ProChef Nonstick Ceramic Frying Pan 10 inch",
+    "description": "Durable nonstick ceramic skillet for everyday cooking, dishwasher safe.",
+    "link": "https://store.example/p/1005",
+    "image_link": "https://store.example/img/1005.jpg",
+    "price": "49.99 USD",
+    "availability": "in_stock",
+    "brand": "Cuisinart",
+    "google_product_category": "668",
+    "product_type": "Kitchen > Cookware",
+    "color": "gray",
+    "material": "ceramic"
+  },
+  {
+    "id": "SKU-1006",
+    "title": "Daypack",
+    "description": "A backpack.",
+    "link": "https://store.example/p/1006",
+    "image_link": "https://store.example/img/1006.jpg",
+    "price": "69.99 USD",
+    "availability": "in_stock",
+    "brand": "Herschel",
+    "vision_tags": "two-tone; padded straps; laptop sleeve"
+  }
+]

@@ -9,6 +9,8 @@
  *   classify "<text>"           map text to GPC categories
  *   taxonomy <id|path>          inspect a taxonomy node
  *   index <file.json>           load products and report graph stats
+ *   analyze <feed.json>         feed audit: coverage, gaps, fixes & simulated lift
+ *                               (--search-terms terms.csv to use real query data)
  *
  * Flags for `search`:
  *   --limit N        max results (default 8)
@@ -25,10 +27,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { createShoppingSystem } from '../src/index.js';
+import { createShoppingSystem, analyzeFeed } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DATA = resolve(__dirname, '../data/products.enriched.json');
+const DEFAULT_FEED = resolve(__dirname, '../data/feed.sample.json');
 
 function loadProducts(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
@@ -205,6 +208,63 @@ function cmdDemo() {
   console.log('\nDone. Try:  node bin/cli.js parse "headphones to block out noise on a plane"');
 }
 
+function cmdAnalyze(positional, flags) {
+  const feedFile = positional[0] ?? (typeof flags.feed === 'string' ? flags.feed : DEFAULT_FEED);
+  const feed = readFileSync(feedFile, 'utf8');
+  const stFile = typeof flags['search-terms'] === 'string' ? flags['search-terms'] : null;
+  const searchTermsCsv = stFile ? readFileSync(stFile, 'utf8') : undefined;
+
+  const report = analyzeFeed({ feed, searchTermsCsv });
+  const s = report.summary;
+
+  console.log('='.repeat(72));
+  console.log(' Feed analysis report');
+  console.log('='.repeat(72));
+  console.log(`Feed: ${feedFile}` + (stFile ? `  ·  search terms: ${stFile}` : '  ·  query universe: generated'));
+  console.log(`Products: ${s.products}  ·  Categories: ${s.categories}  ·  Avg feed score: ${s.avgFeedScore}/100`);
+  console.log(`Query universe: ${s.queryUniverse.total} (${s.queryUniverse.real} real, ${s.queryUniverse.generated} generated)`);
+  console.log(
+    `Coverage now: ${s.coverage.well} well · ${s.coverage.weak} weak · ${s.coverage.gap} gaps`,
+  );
+  const lift = s.estimatedLift;
+  console.log(
+    `Estimated lift from fixes: ${lift.wellBefore} → ${lift.wellAfter} well-covered ` +
+      `(${signed(lift.coverageGain)} queries, ${signed(lift.valueCoverageGainPct)}% by value) · ` +
+      `${lift.queriesFixed} queries newly fixed`,
+  );
+
+  console.log('\nTop opportunities (high-value queries not strongly covered):');
+  console.log('  ✓ = a recommended fix would newly cover this query');
+  console.log('─'.repeat(72));
+  if (report.gaps.length === 0) console.log('  (none — catalog covers the query universe well)');
+  for (const g of report.gaps.slice(0, 10)) {
+    const fix = g.wouldFix ? '✓' : ' ';
+    console.log(`  ${fix} "${g.query}"  [${g.bucket}, ${g.source}, value ${Math.round(g.value)}]  ${g.bestScore} → ${g.afterScore}`);
+  }
+
+  console.log('\nPer-product fixes (worst feed score first):');
+  console.log('─'.repeat(72));
+  for (const p of report.products) {
+    console.log(`\n[${p.feedScore}/100] ${p.id} — "${p.title}"`);
+    const sim = p.simulation;
+    console.log(`   coverage ${sim.beforeCovered} → ${sim.afterCovered} of ${sim.relevantQueries} category queries ` +
+      `(+${sim.newlyCovered} newly covered)`);
+    for (const r of p.recommendations.slice(0, 5)) {
+      console.log(`   [${r.priority}] ${r.message}`);
+    }
+  }
+  console.log('\nTip: add --search-terms data/search-terms.sample.csv to score against real queries.');
+}
+
+function pct(part, cov) {
+  const total = cov.valueWell + cov.valueWeak + cov.valueGap;
+  return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function signed(n) {
+  return n >= 0 ? `+${n}` : `${n}`;
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -223,6 +283,7 @@ Usage:
   shopping-graph classify "<text>" [--limit N]
   shopping-graph taxonomy [<id|path>]
   shopping-graph index [<file.json>]
+  shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>]
 `);
 }
 
@@ -236,6 +297,7 @@ function main() {
     case 'classify': return cmdClassify(positional, flags);
     case 'taxonomy': return cmdTaxonomy(positional);
     case 'index': return cmdIndex(positional, flags);
+    case 'analyze': return cmdAnalyze(positional, flags);
     case undefined:
     case 'help':
     case '--help':

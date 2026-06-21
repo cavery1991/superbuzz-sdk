@@ -31,6 +31,11 @@ export { CONCEPTS } from './embeddings/concepts.js';
 export { QueryParser } from './query/query-parser.js';
 export { buildProductProfile } from './product/profile.js';
 export { applyContext, CoPurchaseModel } from './ranking/context.js';
+export { ingestFeed, ingestSearchTerms } from './feed/feed-ingest.js';
+export { buildQueryUniverse } from './feed/query-universe.js';
+export { auditProduct } from './feed/auditor.js';
+export { optimizeProduct } from './feed/optimizer.js';
+export { analyzeFeed } from './feed/analyzer.js';
 
 /**
  * Wire up a complete, ready-to-use shopping system.
