@@ -136,6 +136,11 @@ function Overview({ report, s, onQuery }) {
     <>
       <h1>Feed overview</h1>
       <div className="sub">How your catalog matches shopper demand today — and the upside from fixing it.</div>
+      {s.truncated && (
+        <div className="card" style={{ marginBottom: 16, borderColor: '#f0b429', background: 'var(--amber-bg)', color: 'var(--amber)' }}>
+          Large feed: analyzing the first <b>{s.products}</b> of <b>{s.totalProducts}</b> products for speed.
+        </div>
+      )}
       <div className="cards">
         <Kpi k="Avg feed score" v={<>{s.avgFeedScore}<small>/100</small></>} d={`${s.compliance.atRisk} at disapproval risk`} />
         <Kpi k="Well-covered" v={<>{s.coverage.well}<small>/{total}</small></>} d={`${pct(s.coverage.well)}% of tracked queries`} />

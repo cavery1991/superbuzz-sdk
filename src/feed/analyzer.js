@@ -55,13 +55,19 @@ export async function analyzeFeedAsync({ feed, searchTermsCsv, system, threshold
   });
 }
 
-export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {} } = {}) {
+export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {}, maxProducts } = {}) {
   const th = { ...THRESHOLDS, ...thresholds };
   const sys = system ?? createShoppingSystem();
   const { taxonomy, embedder, engine } = sys;
 
   // 1. Ingest feed; index products and capture their fused profiles.
-  const items = ingestFeed(feed, taxonomy);
+  const allItems = ingestFeed(feed, taxonomy);
+  if (allItems.length === 0) {
+    throw new Error('No products found in the feed. Check the format (XML/CSV/TSV/JSON) or that the URL returns a product feed.');
+  }
+  const totalProducts = allItems.length;
+  const truncated = maxProducts != null && totalProducts > maxProducts;
+  const items = truncated ? allItems.slice(0, maxProducts) : allItems;
   const enriched = items.map((it) => {
     const profile = buildProductProfile({
       feed: it.product,
@@ -189,6 +195,8 @@ export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {} } = 
   return {
     summary: {
       products: enriched.length,
+      totalProducts,
+      truncated,
       categories: new Set(enriched.map((e) => e.stored.categoryId).filter((c) => c != null)).size,
       queryUniverse: {
         total: universe.length,

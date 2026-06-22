@@ -9,22 +9,36 @@ import {
   auditProduct, optimizeProduct, predictAppearance, extractProductFromHtml, scanProduct,
 } from 'shopping-graph';
 
-/** Full feed analysis report. */
+// Cap how many products we analyze in one web request, so a huge hosted feed
+// (tens of thousands of items) doesn't appear to hang.
+const MAX_PRODUCTS = 800;
+
+/** Full feed analysis report (capped for responsiveness). */
 export function runAnalyze(feed, searchTermsCsv) {
-  return analyzeFeed({ feed, searchTermsCsv: searchTermsCsv || undefined });
+  return analyzeFeed({ feed, searchTermsCsv: searchTermsCsv || undefined, maxProducts: MAX_PRODUCTS });
 }
 
-/** Fetch a hosted feed (XML/CSV/TSV/JSON) from a URL. */
-export async function fetchFeedFromUrl(url) {
+/** Fetch a hosted feed (XML/CSV/TSV/JSON) from a URL, with a timeout. */
+export async function fetchFeedFromUrl(url, { timeoutMs = 25000 } = {}) {
   if (!/^https?:\/\//i.test(String(url))) throw new Error('URL must start with http:// or https://');
-  const res = await fetch(url, {
-    headers: { 'user-agent': 'Mozilla/5.0 ShopGraphBot', accept: 'application/xml,text/csv,application/json,*/*' },
-    redirect: 'follow',
-  });
-  if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text.trim()) throw new Error('The URL returned an empty response.');
-  return text;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'Mozilla/5.0 ShopGraphBot', accept: 'application/xml,text/csv,application/json,*/*' },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+    const text = await res.text();
+    if (!text.trim()) throw new Error('The URL returned an empty response.');
+    return text;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`Feed fetch timed out after ${timeoutMs / 1000}s.`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Appearance prediction for one query across the uploaded feed. */
