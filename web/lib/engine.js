@@ -14,6 +14,19 @@ export function runAnalyze(feed, searchTermsCsv) {
   return analyzeFeed({ feed, searchTermsCsv: searchTermsCsv || undefined });
 }
 
+/** Fetch a hosted feed (XML/CSV/TSV/JSON) from a URL. */
+export async function fetchFeedFromUrl(url) {
+  if (!/^https?:\/\//i.test(String(url))) throw new Error('URL must start with http:// or https://');
+  const res = await fetch(url, {
+    headers: { 'user-agent': 'Mozilla/5.0 ShopGraphBot', accept: 'application/xml,text/csv,application/json,*/*' },
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+  const text = await res.text();
+  if (!text.trim()) throw new Error('The URL returned an empty response.');
+  return text;
+}
+
 /** Appearance prediction for one query across the uploaded feed. */
 export function runPredict(feed, query, appearThreshold = 0.45) {
   const sys = createShoppingSystem();

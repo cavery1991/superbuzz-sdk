@@ -17,16 +17,16 @@ export default function Page() {
   const [predictSeed, setPredictSeed] = useState('waterproof hiking boots');
   const goPredict = (q) => { setPredictSeed(q); setTab('predict'); };
 
-  const analyze = useCallback(async (feed, searchTerms) => {
+  const analyze = useCallback(async ({ feed, url, searchTerms }) => {
     setBusy(true); setError(null);
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ feed, searchTerms }),
+        body: JSON.stringify({ feed, url, searchTerms }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
-      setFeedText(feed);
+      setFeedText(data.feed || feed || ''); // resolved feed text (incl. fetched-from-URL)
       setReport(data.report);
       setView('app'); setTab('overview');
     } catch (e) { setError(e.message); }
@@ -39,12 +39,20 @@ export default function Page() {
       const res = await fetch('/api/sample');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not load sample');
-      await analyze(data.feed, data.searchTerms);
+      await analyze({ feed: data.feed, searchTerms: data.searchTerms });
     } catch (e) { setError(e.message); setBusy(false); }
   }, [analyze]);
 
   if (view === 'upload') {
-    return <Upload onFeed={analyze} onSample={loadSample} busy={busy} error={error} />;
+    return (
+      <Upload
+        onFeed={(feed) => analyze({ feed })}
+        onUrl={(url) => analyze({ url })}
+        onSample={loadSample}
+        busy={busy}
+        error={error}
+      />
+    );
   }
 
   const s = report.summary;
@@ -77,15 +85,27 @@ export default function Page() {
 }
 
 /* ---------- Upload ---------- */
-function Upload({ onFeed, onSample, busy, error }) {
+function Upload({ onFeed, onUrl, onSample, busy, error }) {
   const [drag, setDrag] = useState(false);
+  const [url, setUrl] = useState('');
   const fileRef = useRef(null);
   const onFile = async (file) => { if (file) onFeed(await file.text()); };
+  const submitUrl = () => { if (url.trim()) onUrl(url.trim()); };
   return (
     <div className="wrap center">
       <div className="logo" style={{ fontSize: 20, marginBottom: 22 }}><span className="dot" />ShopGraph</div>
       <h1>Will your products appear?</h1>
-      <div className="sub">Upload a client&apos;s product feed (XML, CSV, TSV or JSON) to see what it ranks for — and what to fix.</div>
+      <div className="sub">Paste a feed URL or upload a client&apos;s product feed (XML, CSV, TSV or JSON).</div>
+
+      <div className="search" style={{ width: 'min(560px,92vw)', marginBottom: 16 }}>
+        <span>🔗</span>
+        <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitUrl()}
+          placeholder="https://feeds.datafeedwatch.com/…/feed.xml" autoComplete="off" />
+        <button className="btn" onClick={submitUrl} disabled={busy}>{busy ? <span className="spin" /> : 'Analyze'}</button>
+      </div>
+
+      <div className="small muted" style={{ margin: '2px 0 14px' }}>— or —</div>
+
       <div
         className={`drop ${drag ? 'drag' : ''}`}
         style={{ width: 'min(560px,92vw)' }}
@@ -103,7 +123,7 @@ function Upload({ onFeed, onSample, busy, error }) {
       <div className="row" style={{ marginTop: 18 }}>
         <button className="btn ghost" onClick={onSample} disabled={busy}>Use sample feed</button>
       </div>
-      {error && <div style={{ color: 'var(--red)', marginTop: 16 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--red)', marginTop: 16, maxWidth: 560 }}>{error}</div>}
     </div>
   );
 }

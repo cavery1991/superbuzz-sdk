@@ -12,7 +12,8 @@ npm install        # installs Next + the parent engine (file: dependency)
 npm run dev        # http://localhost:3000
 ```
 
-Upload a feed (XML / CSV / TSV / JSON) or click **Use sample feed**.
+Paste a hosted feed URL (e.g. a DataFeedWatch / Merchant Center XML link), upload
+a feed file (XML / CSV / TSV / JSON), or click **Use sample feed**.
 
 ## Screens
 
@@ -26,7 +27,7 @@ Upload a feed (XML / CSV / TSV / JSON) or click **Use sample feed**.
 
 All server-side (Node runtime), thin wrappers over the engine in `lib/engine.js`:
 
-- `POST /api/analyze` `{ feed, searchTerms? }` → full report
+- `POST /api/analyze` `{ feed | url, searchTerms? }` → full report (fetches `url` server-side)
 - `POST /api/predict` `{ feed, query, threshold? }` → appearance verdicts
 - `POST /api/scan`    `{ url }` or `{ html }` → PDP scan
 - `GET  /api/sample`  → bundled sample feed + search terms
