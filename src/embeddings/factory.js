@@ -12,6 +12,7 @@
 
 import { LocalEmbedder } from './embedder.js';
 import { RemoteEmbedder } from './remote-embedder.js';
+import { NeuralEmbedder } from './neural-embedder.js';
 
 /**
  * @param {object} [opts] explicit overrides (win over env)
@@ -29,6 +30,16 @@ export function createEmbedder(opts = {}, env = process.env) {
   const provider = (opts.provider ?? env.EMBEDDINGS_PROVIDER ?? 'local').toLowerCase();
 
   if (provider === 'local') return new LocalEmbedder(opts.local);
+
+  // Free, in-process open-source model (transformers.js). No key, no cost.
+  if (provider === 'neural' || provider === 'local-neural') {
+    return new NeuralEmbedder({
+      model: opts.model ?? env.EMBEDDINGS_MODEL,
+      cacheDir: opts.cacheDir ?? env.EMBEDDINGS_CACHE_DIR,
+      pipelineFactory: opts.pipelineFactory,
+      cache: opts.cache,
+    });
+  }
 
   if (provider === 'remote' || provider === 'openai') {
     const apiKey = opts.apiKey ?? env.EMBEDDINGS_API_KEY ?? env.OPENAI_API_KEY;

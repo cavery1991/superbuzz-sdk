@@ -28,10 +28,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  createShoppingSystem, analyzeFeed, renderHtmlReport,
+  createShoppingSystem, createShoppingSystemAsync, analyzeFeed, renderHtmlReport,
   ingestSearchTerms, ingestFeed, buildProductProfile,
   evaluate, calibrateThresholds, validateAgainstPerformance,
-  createGenerator, shareOfVoice, priceComparison,
+  createGenerator, createEmbedder, cosineSimilarity, shareOfVoice, priceComparison,
   CHANNELS, exportForChannel, missingRequiredFields, toTSV,
   snapshot, diffSnapshots, detectAlerts,
   auditProduct, optimizeProduct, predictAppearance,
@@ -112,14 +112,13 @@ function printResults(out, explain) {
   });
 }
 
-function cmdSearch(positional, flags) {
+async function cmdSearch(positional, flags) {
   const query = positional.join(' ');
   if (!query) return fail('search requires a query, e.g. search "warm winter coat"');
-  const sys = buildSystem(flags.data);
   const context = {};
   if (typeof flags.region === 'string') context.region = flags.region;
   if (typeof flags.device === 'string') context.device = flags.device;
-  const out = sys.engine.search(query, {
+  const opts = {
     limit: flags.limit ? Number(flags.limit) : 8,
     inStockOnly: !!flags['in-stock'],
     brand: typeof flags.brand === 'string' ? flags.brand : undefined,
@@ -127,8 +126,19 @@ function cmdSearch(positional, flags) {
     minRating: flags['min-rating'] ? Number(flags['min-rating']) : undefined,
     useCategory: !flags['no-category'],
     context: Object.keys(context).length ? context : undefined,
-  });
-  printResults(out, !!flags.explain);
+  };
+
+  // Real free neural model path (downloads/caches on first run; falls back to local).
+  if (flags.neural) {
+    const sys = await createShoppingSystemAsync({ embedderOptions: { provider: 'neural' } });
+    console.log(`(embedder: ${sys.embedder.constructor.name}, ${sys.embedder.dim} dims)`);
+    await sys.engine.indexAllAsync(loadProducts(flags.data ?? DEFAULT_DATA));
+    printResults(await sys.engine.searchAsync(query, opts), !!flags.explain);
+    return;
+  }
+
+  const sys = buildSystem(flags.data);
+  printResults(sys.engine.search(query, opts), !!flags.explain);
 }
 
 function cmdParse(positional) {
@@ -551,6 +561,27 @@ function pad(s, n) {
   return str.length >= n ? str.slice(0, n - 1) + '…' : str.padEnd(n);
 }
 
+async function cmdEmbed(positional, flags) {
+  const texts = positional.length ? positional : ['warm winter coat', 'insulated thermal parka', 'nonstick frying pan'];
+  const provider = typeof flags.provider === 'string' ? flags.provider : (process.env.EMBEDDINGS_PROVIDER ?? 'neural');
+  const embedder = createEmbedder({ provider, model: typeof flags.model === 'string' ? flags.model : undefined });
+  console.log(`Provider: ${provider} (${embedder.constructor.name})`);
+  try {
+    if (provider === 'neural') console.log('Loading model (first run downloads weights, then caches to .models/)…');
+    await embedder.warm(texts);
+  } catch (err) {
+    return fail(`${err.message}`);
+  }
+  console.log(`Dimensions: ${embedder.dim}\n`);
+  const vecs = texts.map((t) => embedder.embed(t));
+  console.log('Pairwise cosine similarity:');
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      console.log(`  ${cosineSimilarity(vecs[i], vecs[j]).toFixed(3)}  "${texts[i]}"  ~  "${texts[j]}"`);
+    }
+  }
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -569,6 +600,8 @@ Usage:
   shopping-graph classify "<text>" [--limit N]
   shopping-graph taxonomy [<id|path>]
   shopping-graph index [<file.json>]
+  shopping-graph embed ["text" ...] [--provider neural|local|remote]   (free real model)
+  shopping-graph search "<query>" [--neural]   (use the free in-process model)
   shopping-graph predict "<search term>" [--data feed.json] [--product id] [--threshold N]
   shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>]
   shopping-graph generate [<feed.json>] [--provider llm|template] [--out optimized.json]
@@ -586,6 +619,7 @@ async function main() {
   switch (cmd) {
     case 'demo': return cmdDemo();
     case 'search': return cmdSearch(positional, flags);
+    case 'embed': return cmdEmbed(positional, flags);
     case 'parse': return cmdParse(positional);
     case 'classify': return cmdClassify(positional, flags);
     case 'taxonomy': return cmdTaxonomy(positional);

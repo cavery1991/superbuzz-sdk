@@ -26,6 +26,7 @@ import { createEmbedder } from './embeddings/factory.js';
 export { Taxonomy } from './taxonomy/taxonomy.js';
 export { LocalEmbedder, Embedder, cosineSimilarity, tokenize } from './embeddings/embedder.js';
 export { RemoteEmbedder } from './embeddings/remote-embedder.js';
+export { NeuralEmbedder } from './embeddings/neural-embedder.js';
 export { createEmbedder } from './embeddings/factory.js';
 export { ShoppingGraph } from './graph/shopping-graph.js';
 export { CategoryClassifier } from './search/classifier.js';
@@ -79,8 +80,20 @@ export function createShoppingSystem(opts = {}) {
  */
 export async function createShoppingSystemAsync(opts = {}) {
   const taxonomy = opts.taxonomy ?? Taxonomy.sample();
-  const embedder = opts.embedder ?? createEmbedder(opts.embedderOptions);
-  await embedder.warm(taxonomy.all().map(categoryEmbedText));
+  let embedder = opts.embedder ?? createEmbedder(opts.embedderOptions);
+  const categoryTexts = taxonomy.all().map(categoryEmbedText);
+
+  try {
+    await embedder.warm(categoryTexts);
+  } catch (err) {
+    // A network-backed/neural embedder may be unavailable (no model, no network,
+    // missing optional dep). Never crash — fall back to the offline embedder.
+    if (embedder instanceof LocalEmbedder) throw err;
+    console.warn(`[embeddings] ${embedder.constructor.name} unavailable (${err.message}); falling back to LocalEmbedder`);
+    embedder = new LocalEmbedder();
+    await embedder.warm(categoryTexts);
+  }
+
   const graph = new ShoppingGraph();
   const engine = new SearchEngine({ taxonomy, embedder, graph, weights: opts.weights });
   return { taxonomy, embedder, graph, classifier: engine.classifier, engine };

@@ -31,7 +31,7 @@ node bin/cli.js monitor                            # snapshot + regression alert
 node bin/cli.js eval                               # retrieval metrics + threshold calibration
 node bin/cli.js validate                           # does coverage predict real performance?
 node bin/cli.js demo                               # engine walkthrough
-npm test                                           # 114 tests
+npm test                                           # 125 tests
 ```
 
 ## Appearance prediction (`predict`) — the core question
@@ -147,11 +147,53 @@ tax.get(187).path;                         // "...> Shoes > Athletic Shoes"
 tax.ancestors(187);                        // root → leaf chain
 ```
 
-### Real embedding models (pluggable)
+### Free real embeddings (recommended) — in-process neural model
+`src/embeddings/neural-embedder.js`
+
+The best free option: a real open-source embedding model running **in-process**
+via transformers.js — no API key, no per-token cost, no server. Weights download
+once (from the Hugging Face Hub) and cache to `.models/`, then run on CPU. Default
+model `Xenova/bge-base-en-v1.5` gives **768 genuine learned dimensions** (vs the
+536 hashed dims of the offline `LocalEmbedder`).
+
+```bash
+npm install                              # installs the optional @huggingface/transformers
+node bin/cli.js embed "sofa" "couch" "frying pan"   # downloads the model on first run, then:
+#   Provider: neural (NeuralEmbedder)
+#   Dimensions: 768
+#   0.9xx  "sofa" ~ "couch"        ← real semantic understanding (not in our concept map)
+#   0.1xx  "sofa" ~ "frying pan"
+
+node bin/cli.js search "warm winter coat" --neural   # search powered by the real model
+```
+
+Model choices (set `EMBEDDINGS_MODEL`): `Xenova/all-MiniLM-L6-v2` or
+`Xenova/bge-small-en-v1.5` (384 dims, fastest), `Xenova/bge-base-en-v1.5` (768,
+default), `Xenova/bge-large-en-v1.5` (1024, highest quality). Cache dir via
+`EMBEDDINGS_CACHE_DIR`.
+
+> **Network note:** the model is fetched from `huggingface.co` on first run.
+> In a locked-down/offline environment the download is blocked — the system
+> **falls back to the offline `LocalEmbedder` automatically** (with a warning) so
+> nothing breaks. To use it offline, pre-download the model on a connected
+> machine and copy the `.models/` directory over, or point `EMBEDDINGS_MODEL` at
+> a local path.
+
+Use it from the library via the async API (the model loads/caches asynchronously):
+
+```js
+import { createShoppingSystemAsync } from 'shopping-graph';
+const sys = await createShoppingSystemAsync({ embedderOptions: { provider: 'neural' } });
+await sys.engine.indexAllAsync(products);
+const { results } = await sys.engine.searchAsync('warm winter coat');
+```
+
+### Hosted embedding APIs (also pluggable)
 `src/embeddings/factory.js`, `remote-embedder.js`
 
-The offline `LocalEmbedder` is the default, but a real model drops in behind the
-same `Embedder` interface. `createEmbedder()` selects the provider from env:
+A hosted model also drops in behind the same `Embedder` interface (≈$0.02 / 1M
+tokens — pennies for a whole catalog). `createEmbedder()` selects the provider
+from env:
 
 ```bash
 EMBEDDINGS_PROVIDER=remote \
