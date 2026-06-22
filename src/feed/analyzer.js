@@ -15,7 +15,8 @@
  * so coverage/match are estimated the same way the search side scores products.
  */
 
-import { createShoppingSystem, cosineSimilarity } from '../index.js';
+import { createShoppingSystem, createShoppingSystemAsync, cosineSimilarity } from '../index.js';
+import { runWarmed } from '../embeddings/warm-run.js';
 import { buildProductProfile } from '../product/profile.js';
 import { buildPriceBenchmarks, priceCompetitiveness } from '../pricing/price-intel.js';
 import { checkCompliance } from './compliance.js';
@@ -35,6 +36,25 @@ const THRESHOLDS = { well: 0.45, weak: 0.2 };
  * @param {object} [args.thresholds]
  * @returns {object} the combined report
  */
+/**
+ * Async analyzer for network/neural embedders. Drives the synchronous
+ * {@link analyzeFeed} to a fixpoint over the async embedder (warming as it goes),
+ * so the report is identical to the sync path but powered by real embeddings.
+ *
+ * @param {object} args  same as analyzeFeed, plus:
+ * @param {object} [args.systemOptions]  forwarded to createShoppingSystemAsync
+ * @returns {Promise<object>} the combined report
+ */
+export async function analyzeFeedAsync({ feed, searchTermsCsv, system, thresholds = {}, systemOptions, weights } = {}) {
+  const base = system ?? (await createShoppingSystemAsync(systemOptions ?? { embedderOptions: { provider: 'neural' } }));
+  return runWarmed({
+    inner: base.embedder,
+    taxonomy: base.taxonomy,
+    weights,
+    run: (sys) => analyzeFeed({ feed, searchTermsCsv, system: sys, thresholds }),
+  });
+}
+
 export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {} } = {}) {
   const th = { ...THRESHOLDS, ...thresholds };
   const sys = system ?? createShoppingSystem();

@@ -31,7 +31,7 @@ node bin/cli.js monitor                            # snapshot + regression alert
 node bin/cli.js eval                               # retrieval metrics + threshold calibration
 node bin/cli.js validate                           # does coverage predict real performance?
 node bin/cli.js demo                               # engine walkthrough
-npm test                                           # 125 tests
+npm test                                           # 128 tests
 ```
 
 ## Appearance prediction (`predict`) — the core question
@@ -164,8 +164,18 @@ node bin/cli.js embed "sofa" "couch" "frying pan"   # downloads the model on fir
 #   0.9xx  "sofa" ~ "couch"        ← real semantic understanding (not in our concept map)
 #   0.1xx  "sofa" ~ "frying pan"
 
-node bin/cli.js search "warm winter coat" --neural   # search powered by the real model
+node bin/cli.js search "warm winter coat" --neural    # search powered by the real model
+node bin/cli.js predict "waterproof hiking boots" --neural   # verdicts on real embeddings
+node bin/cli.js analyze --neural --search-terms data/search-terms.sample.csv
 ```
+
+`predict --neural` and `analyze --neural` run the whole pipeline on the real model
+and **auto-calibrate the appear/coverage bar** first: a neural model's cosine scale
+differs from the offline embedder (bge sits around a ~0.5 floor, so the old 0.45
+bar would mark everything relevant), so they fit the bar with `calibrateThresholds`
+against the labeled judgments and use it. The synchronous analyzer is driven to a
+fixpoint over the async model (`runWarmed`), embedding each unique text once. If the
+model can't load, everything falls back to the offline embedder automatically.
 
 Model choices (set `EMBEDDINGS_MODEL`): `Xenova/all-MiniLM-L6-v2` or
 `Xenova/bge-small-en-v1.5` (384 dims, fastest), `Xenova/bge-base-en-v1.5` (768,

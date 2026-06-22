@@ -28,13 +28,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  createShoppingSystem, createShoppingSystemAsync, analyzeFeed, renderHtmlReport,
+  createShoppingSystem, createShoppingSystemAsync, analyzeFeed, analyzeFeedAsync, renderHtmlReport,
   ingestSearchTerms, ingestFeed, buildProductProfile,
   evaluate, calibrateThresholds, validateAgainstPerformance,
   createGenerator, createEmbedder, cosineSimilarity, shareOfVoice, priceComparison,
   CHANNELS, exportForChannel, missingRequiredFields, toTSV,
   snapshot, diffSnapshots, detectAlerts,
-  auditProduct, optimizeProduct, predictAppearance,
+  auditProduct, optimizeProduct, predictAppearance, runWarmed,
 } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -227,13 +227,19 @@ function cmdDemo() {
   console.log('\nDone. Try:  node bin/cli.js parse "headphones to block out noise on a plane"');
 }
 
-function cmdAnalyze(positional, flags) {
+async function cmdAnalyze(positional, flags) {
   const feedFile = positional[0] ?? (typeof flags.feed === 'string' ? flags.feed : DEFAULT_FEED);
   const feed = readFileSync(feedFile, 'utf8');
   const stFile = typeof flags['search-terms'] === 'string' ? flags['search-terms'] : null;
   const searchTermsCsv = stFile ? readFileSync(stFile, 'utf8') : undefined;
 
-  const report = analyzeFeed({ feed, searchTermsCsv });
+  let report;
+  if (flags.neural) {
+    const { sys, thresholds } = await buildNeuralSystem();
+    report = await analyzeFeedAsync({ feed, searchTermsCsv, system: sys, thresholds: thresholds ?? {} });
+  } else {
+    report = analyzeFeed({ feed, searchTermsCsv });
+  }
   const s = report.summary;
 
   // Optional HTML export.
@@ -481,16 +487,9 @@ function cmdMonitor(positional, flags) {
   writeFileSync(stateFile, JSON.stringify(next, null, 2));
 }
 
-function cmdPredict(positional, flags) {
-  const query = positional.join(' ').replace(/^["']|["']$/g, '');
-  if (!query) return fail('predict needs a search term: predict "waterproof hiking boots" [--data feed.json]');
-  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_FEED;
-  const appearThreshold = flags.threshold ? Number(flags.threshold) : 0.45;
-
-  const sys = createShoppingSystem();
-  const { taxonomy } = sys;
-  const items = ingestFeed(readFileSync(dataFile, 'utf8'), taxonomy);
-
+/** Sync core of predict: index the feed, build fix-path embeddings, predict. */
+function predictRun(sys, items, query, appearThreshold) {
+  const { taxonomy, engine, embedder } = sys;
   const rawById = new Map();
   const optimizedById = new Map();
   for (const it of items) {
@@ -499,15 +498,41 @@ function cmdPredict(positional, flags) {
       visionTags: it.raw.visionTags ?? (it.raw.vision_tags ? String(it.raw.vision_tags).split(/[;,|]/) : undefined),
       reviews: it.raw.reviews,
     });
-    const stored = sys.engine.index({ ...it.product });
+    const stored = engine.index({ ...it.product });
     rawById.set(stored.id, it.raw);
     // Fix path: optimized embedding for "would it appear after fixes".
     const audit = auditProduct({ raw: it.raw, provided: it.provided, product: stored, classifier: sys.classifier, taxonomy, derivedTags: profile.derivedTags });
     const opt = optimizeProduct({ raw: it.raw, product: stored, audit, taxonomy, derivedTags: profile.derivedTags, derivedConcepts: profile.derivedConcepts });
-    optimizedById.set(stored.id, sys.embedder.embed(opt.optimizedText));
+    optimizedById.set(stored.id, embedder.embed(opt.optimizedText));
+  }
+  return predictAppearance({ engine, query, appearThreshold, rawById, taxonomy, optimizedById });
+}
+
+async function cmdPredict(positional, flags) {
+  const query = positional.join(' ').replace(/^["']|["']$/g, '');
+  if (!query) return fail('predict needs a search term: predict "waterproof hiking boots" [--data feed.json]');
+  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_FEED;
+
+  let out;
+  let appearThreshold;
+  let taxonomy;
+  if (flags.neural) {
+    const { sys, thresholds } = await buildNeuralSystem();
+    taxonomy = sys.taxonomy;
+    appearThreshold = flags.threshold ? Number(flags.threshold) : (thresholds ? thresholds.well : 0.45);
+    const items = ingestFeed(readFileSync(dataFile, 'utf8'), sys.taxonomy);
+    out = await runWarmed({
+      inner: sys.embedder, taxonomy: sys.taxonomy,
+      run: (s) => predictRun(s, items, query, appearThreshold),
+    });
+  } else {
+    appearThreshold = flags.threshold ? Number(flags.threshold) : 0.45;
+    const sys = createShoppingSystem();
+    taxonomy = sys.taxonomy;
+    const items = ingestFeed(readFileSync(dataFile, 'utf8'), sys.taxonomy);
+    out = predictRun(sys, items, query, appearThreshold);
   }
 
-  const out = predictAppearance({ engine: sys.engine, query, appearThreshold, rawById, taxonomy, optimizedById });
   const aisle = out.intentCategoryId != null ? taxonomy.get(out.intentCategoryId) : null;
 
   console.log('='.repeat(72));
@@ -561,6 +586,32 @@ function pad(s, n) {
   return str.length >= n ? str.slice(0, n - 1) + '…' : str.padEnd(n);
 }
 
+/**
+ * Build an async (neural) system and auto-calibrate the "appear" bar against the
+ * labeled judgments — because the cosine scale of a real model differs from the
+ * offline embedder (bge has a ~0.5 floor, so the old 0.45 bar is meaningless).
+ * Falls back transparently to the offline embedder if the model is unavailable.
+ */
+async function buildNeuralSystem() {
+  const sys = await createShoppingSystemAsync({ embedderOptions: { provider: 'neural' } });
+  const isNeural = sys.embedder.constructor.name !== 'LocalEmbedder';
+  let thresholds = null;
+  if (isNeural) {
+    const labeled = loadProducts(DEFAULT_DATA);
+    const judgments = JSON.parse(readFileSync(DEFAULT_JUDGMENTS, 'utf8'));
+    const cal = await runWarmed({
+      inner: sys.embedder,
+      taxonomy: sys.taxonomy,
+      run: (s) => { s.engine.indexAll(labeled); return calibrateThresholds(s.engine, judgments); },
+    });
+    thresholds = cal.recommended;
+    console.log(`(embedder: ${sys.embedder.constructor.name}, ${sys.embedder.dim} dims · calibrated appear bar: ${thresholds.well}, weak: ${thresholds.weak})`);
+  } else {
+    console.log('(neural model unavailable — using offline LocalEmbedder with default bars)');
+  }
+  return { sys, thresholds, isNeural };
+}
+
 async function cmdEmbed(positional, flags) {
   const texts = positional.length ? positional : ['warm winter coat', 'insulated thermal parka', 'nonstick frying pan'];
   const provider = typeof flags.provider === 'string' ? flags.provider : (process.env.EMBEDDINGS_PROVIDER ?? 'neural');
@@ -602,8 +653,8 @@ Usage:
   shopping-graph index [<file.json>]
   shopping-graph embed ["text" ...] [--provider neural|local|remote]   (free real model)
   shopping-graph search "<query>" [--neural]   (use the free in-process model)
-  shopping-graph predict "<search term>" [--data feed.json] [--product id] [--threshold N]
-  shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>]
+  shopping-graph predict "<search term>" [--data feed.json] [--product id] [--threshold N] [--neural]
+  shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>] [--neural]
   shopping-graph generate [<feed.json>] [--provider llm|template] [--out optimized.json]
   shopping-graph compete <competitors.json> [--data ours.json]
   shopping-graph channels <google|meta|amazon> [--data feed.json] [--out file.tsv]
