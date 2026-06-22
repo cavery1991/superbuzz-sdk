@@ -10,7 +10,8 @@
   "scripts": {
     "test": "node --test",
     "demo": "node bin/cli.js demo",
-    "start": "node bin/cli.js"
+    "start": "node bin/cli.js",
+    "prototype": "node scripts/build-prototype.js"
   },
   "keywords": [
     "google-shopping",
