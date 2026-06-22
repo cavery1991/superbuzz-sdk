@@ -123,7 +123,9 @@ function isAllCaps(title) {
 function isApparelCategory(categoryId, taxonomy) {
   if (categoryId == null || !taxonomy) return false;
   const path = taxonomy.ancestors(categoryId).map((n) => n.name).join(' > ');
-  return /apparel|clothing|shoes|footwear/i.test(path);
+  // Size/gender/age_group are required for clothing & footwear — not for the
+  // rest of "Apparel & Accessories" (handbags, jewelry, belts, etc.).
+  return /clothing|shoes|footwear/i.test(path);
 }
 
 function issue(code, severity, message) {

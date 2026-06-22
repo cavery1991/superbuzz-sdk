@@ -34,6 +34,7 @@ import {
   createGenerator, shareOfVoice, priceComparison,
   CHANNELS, exportForChannel, missingRequiredFields, toTSV,
   snapshot, diffSnapshots, detectAlerts,
+  auditProduct, optimizeProduct, predictAppearance,
 } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -470,6 +471,86 @@ function cmdMonitor(positional, flags) {
   writeFileSync(stateFile, JSON.stringify(next, null, 2));
 }
 
+function cmdPredict(positional, flags) {
+  const query = positional.join(' ').replace(/^["']|["']$/g, '');
+  if (!query) return fail('predict needs a search term: predict "waterproof hiking boots" [--data feed.json]');
+  const dataFile = typeof flags.data === 'string' ? flags.data : DEFAULT_FEED;
+  const appearThreshold = flags.threshold ? Number(flags.threshold) : 0.45;
+
+  const sys = createShoppingSystem();
+  const { taxonomy } = sys;
+  const items = ingestFeed(readFileSync(dataFile, 'utf8'), taxonomy);
+
+  const rawById = new Map();
+  const optimizedById = new Map();
+  for (const it of items) {
+    const profile = buildProductProfile({
+      feed: it.product, schema: it.raw.schema,
+      visionTags: it.raw.visionTags ?? (it.raw.vision_tags ? String(it.raw.vision_tags).split(/[;,|]/) : undefined),
+      reviews: it.raw.reviews,
+    });
+    const stored = sys.engine.index({ ...it.product });
+    rawById.set(stored.id, it.raw);
+    // Fix path: optimized embedding for "would it appear after fixes".
+    const audit = auditProduct({ raw: it.raw, provided: it.provided, product: stored, classifier: sys.classifier, taxonomy, derivedTags: profile.derivedTags });
+    const opt = optimizeProduct({ raw: it.raw, product: stored, audit, taxonomy, derivedTags: profile.derivedTags, derivedConcepts: profile.derivedConcepts });
+    optimizedById.set(stored.id, sys.embedder.embed(opt.optimizedText));
+  }
+
+  const out = predictAppearance({ engine: sys.engine, query, appearThreshold, rawById, taxonomy, optimizedById });
+  const aisle = out.intentCategoryId != null ? taxonomy.get(out.intentCategoryId) : null;
+
+  console.log('='.repeat(72));
+  console.log(` Appearance prediction — "${query}"`);
+  console.log('='.repeat(72));
+  console.log(`Inferred aisle: ${aisle ? `[${aisle.id}] ${aisle.path}` : '(none)'}  ·  appear bar: ${appearThreshold}`);
+
+  // Single-product focus mode.
+  if (typeof flags.product === 'string') {
+    const r = out.rows.find((x) => x.id === flags.product);
+    if (!r) return fail(`product "${flags.product}" not found in ${dataFile}`);
+    console.log(`\nProduct ${r.id} — "${r.title}"`);
+    console.log(`  VERDICT: ${r.verdict.toUpperCase()}  ·  relevance ${r.relevance}  ·  appear probability ${Math.round(r.probability * 100)}%` + (r.rank ? `  ·  rank #${r.rank}` : ''));
+    for (const reason of r.reasons) console.log(`  - ${reason}`);
+    return;
+  }
+
+  const c = out.counts;
+  console.log(`Verdict counts: ${c.appears} appear · ${c.borderline} borderline · ${c.absent} absent · ${c.ineligible} ineligible\n`);
+
+  const appears = out.rows.filter((r) => r.verdict === 'appears');
+  console.log(`WOULD APPEAR (${appears.length}):`);
+  if (!appears.length) console.log('  (nothing in this catalog would appear for this term)');
+  for (const r of appears) console.log(`  #${r.rank}  ${r.id}  ${pad(r.title, 38)}  rel ${r.relevance}  conf ${Math.round(r.probability * 100)}%`);
+
+  const borderline = out.rows.filter((r) => r.verdict === 'borderline');
+  if (borderline.length) {
+    console.log(`\nBORDERLINE — small fixes away (${borderline.length}):`);
+    for (const r of borderline) {
+      const fix = r.afterFix?.crossesBar ? `  → after feed fixes: ${r.afterFix.relevance} ✓ would appear` : '';
+      console.log(`  ${r.id}  ${pad(r.title, 30)}  rel ${r.relevance}${fix}`);
+      if (r.missingTerms.length) console.log(`      add to feed: ${r.missingTerms.join(', ')}`);
+    }
+  }
+
+  const ineligible = out.rows.filter((r) => r.verdict === 'ineligible');
+  if (ineligible.length) {
+    console.log(`\nINELIGIBLE — relevant but can't serve (${ineligible.length}):`);
+    for (const r of ineligible) console.log(`  ${r.id}  ${pad(r.title, 30)}  (${r.eligibilityIssues.join(', ')})`);
+  }
+
+  const absent = out.rows.filter((r) => r.verdict === 'absent');
+  if (absent.length) {
+    console.log(`\nWON'T APPEAR — not relevant (${absent.length}): ${absent.map((r) => r.id).join(', ')}`);
+  }
+  console.log('\nTip: --product <id> for a detailed single-product verdict; --threshold N to adjust the bar.');
+}
+
+function pad(s, n) {
+  const str = String(s ?? '');
+  return str.length >= n ? str.slice(0, n - 1) + '…' : str.padEnd(n);
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -488,6 +569,7 @@ Usage:
   shopping-graph classify "<text>" [--limit N]
   shopping-graph taxonomy [<id|path>]
   shopping-graph index [<file.json>]
+  shopping-graph predict "<search term>" [--data feed.json] [--product id] [--threshold N]
   shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>]
   shopping-graph generate [<feed.json>] [--provider llm|template] [--out optimized.json]
   shopping-graph compete <competitors.json> [--data ours.json]
@@ -509,6 +591,7 @@ async function main() {
     case 'taxonomy': return cmdTaxonomy(positional);
     case 'index': return cmdIndex(positional, flags);
     case 'analyze': return cmdAnalyze(positional, flags);
+    case 'predict': return cmdPredict(positional, flags);
     case 'generate': return cmdGenerate(positional, flags);
     case 'compete': return cmdCompete(positional, flags);
     case 'channels': return cmdChannels(positional, flags);

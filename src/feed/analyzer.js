@@ -99,7 +99,9 @@ export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {} } = 
     for (const a of audited) {
       const sb = cosineSimilarity(q.vec, a.e.stored.embedding);
       if (sb > bBest) { bBest = sb; bId = a.e.stored.id; }
-      const sa = cosineSimilarity(q.vec, a.optimizedVec);
+      // A fix is opt-in: it can only help a product's own match, never hurt it,
+      // so the effective optimized score is never worse than the current one.
+      const sa = Math.max(sb, cosineSimilarity(q.vec, a.optimizedVec));
       if (sa > aBest) aBest = sa;
     }
     tally(before, bBest, q.value, th);
@@ -126,8 +128,9 @@ export function analyzeFeed({ feed, searchTermsCsv, system, thresholds = {} } = 
     const relevant = queryVecs.filter((q) => q.categoryId === (opt.suggestedCategoryId ?? e.stored.categoryId));
     let beforeCovered = 0, afterCovered = 0;
     for (const q of relevant) {
-      if (cosineSimilarity(q.vec, e.stored.embedding) >= th.well) beforeCovered++;
-      if (cosineSimilarity(q.vec, optimizedVec) >= th.well) afterCovered++;
+      const before = cosineSimilarity(q.vec, e.stored.embedding);
+      if (before >= th.well) beforeCovered++;
+      if (Math.max(before, cosineSimilarity(q.vec, optimizedVec)) >= th.well) afterCovered++;
     }
     const price = priceCompetitiveness(e.stored, benchmarks);
     const compliance = checkCompliance({ raw: e.raw, product: e.stored, taxonomy });

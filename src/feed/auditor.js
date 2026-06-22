@@ -109,7 +109,9 @@ export function auditProduct({ raw, provided, product, classifier, taxonomy, der
 function isApparelCategory(categoryId, taxonomy) {
   if (categoryId == null) return false;
   const path = taxonomy.ancestors(categoryId).map((n) => n.name).join(' > ').toLowerCase();
-  return /apparel|clothing|shoes|footwear/.test(path);
+  // Apparel attribute requirements (size/gender/age_group) apply to clothing &
+  // footwear, not to bags/jewelry/other accessories under "Apparel & Accessories".
+  return /clothing|shoes|footwear/.test(path);
 }
 
 function issue(type, field, severity, message, extra = {}) {

@@ -52,15 +52,20 @@
   },
   {
     "id": "SKU-1004",
-    "title": "Hiking Boots",
+    "title": "Waterproof Hiking Boots",
     "description": "Boots for outdoors.",
     "link": "https://store.example/p/1004",
     "image_link": "https://store.example/img/1004.jpg",
     "price": "159.99 USD",
     "availability": "in_stock",
     "brand": "Timberland",
+    "google_product_category": "3237",
     "color": "brown",
     "material": "leather",
+    "size": "11",
+    "gender": "unisex",
+    "age_group": "adult",
+    "gtin": "00191234567894",
     "reviews": [
       { "text": "Grip is amazing, didn't slip on ice at all.", "rating": 5 },
       { "text": "Kept my feet dry crossing streams, very durable.", "rating": 5 }

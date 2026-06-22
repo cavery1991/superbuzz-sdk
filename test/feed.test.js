@@ -20,8 +20,11 @@ test('ingestFeed: normalizes Google feed spec fields', () => {
   assert.equal(boots.product.currency, 'USD');
   assert.equal(boots.product.inStock, true);
   assert.equal(boots.product.attributes.color, 'brown');
-  assert.equal(boots.product.categoryId, null); // feed omitted google_product_category
-  assert.ok(!boots.provided.has('google_product_category'));
+
+  // The daypack feed omits google_product_category → categoryId stays null.
+  const daypack = items.find((i) => i.product.id === 'SKU-1006');
+  assert.equal(daypack.product.categoryId, null);
+  assert.ok(!daypack.provided.has('google_product_category'));
 
   const sneakers = items.find((i) => i.product.id === 'SKU-1002');
   assert.equal(sneakers.product.categoryId, 187); // numeric gpc resolved

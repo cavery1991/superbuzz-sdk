@@ -51,6 +51,7 @@ export { ingestTrends, demandMultiplier, applyDemandToUniverse, risingOpportunit
 export { snapshot, diffSnapshots, detectAlerts } from './monitor/monitor.js';
 export { LearnedRanker, FEATURE_KEYS, DEFAULT_WEIGHTS as RANKER_WEIGHTS, sigmoid } from './ranking/ranker.js';
 export { TemplateGenerator, LLMGenerator, createGenerator } from './generate/feed-generator.js';
+export { predictAppearance, predictForProduct } from './predict/appearance.js';
 
 /**
  * Wire up a complete, ready-to-use shopping system (synchronous; offline embedder).

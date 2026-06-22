@@ -18,6 +18,8 @@ sample data. The embedding provider is pluggable, so a real model
 (Vertex AI / MUM / BERT-style) can be swapped in without touching callers.
 
 ```bash
+node bin/cli.js predict "waterproof hiking boots"  # ← would each product appear, and why?
+node bin/cli.js predict "warm winter coat" --product SKU-1001   # detailed single-product verdict
 node bin/cli.js analyze data/feed.sample.json \
   --search-terms data/search-terms.sample.csv \
   --html feed-report.html                          # full report: coverage, gaps, fixes,
@@ -32,10 +34,46 @@ node bin/cli.js demo                               # engine walkthrough
 npm test                                           # 114 tests
 ```
 
+## Appearance prediction (`predict`) — the core question
+
+> *Given a client's product feed and a search term, would each product appear?*
+
+`predict` is the direct answer. It mimics Google's match by combining three things
+into a verdict per product:
+
+1. **Relevance** — the product's vector vs the query vector (cosine), against a
+   calibrated "appear" bar.
+2. **Eligibility** — is it actually servable? In stock and not policy-disapproved.
+   A perfectly relevant item that's out of stock or disapproved *never shows*, so
+   eligibility gates the verdict.
+3. **Fix path** — if it falls short, would applying the recommended feed changes
+   push it over the bar?
+
+Verdicts: **appears** (with rank + confidence), **borderline** (small fixes away,
+with the exact terms to add), **absent** (not relevant), **ineligible** (relevant
+but can't serve — with the reason). Example:
+
+```
+Appearance prediction — "waterproof hiking boots"
+Inferred aisle: [3237] Apparel & Accessories > Shoes > Boots  ·  appear bar: 0.45
+Verdict counts: 1 appear · 0 borderline · 4 absent · 1 ineligible
+
+WOULD APPEAR (1):
+  #1  SKU-1004  Waterproof Hiking Boots   rel 0.584  conf 83%
+INELIGIBLE — relevant but can't serve (1):
+  SKU-1001  Parka   (likely disapproved)
+```
+
+Library: `predictAppearance({ engine, query, ... })` / `predictForProduct(args, id)`.
+The "appear bar" is a threshold you calibrate against labeled data with the eval
+harness (`calibrateThresholds`). This is a *simulation* of Google's matching, not
+Google — treat the probability as directional.
+
 ## Capability map
 
 | Capability | Module / command | What it adds |
 |---|---|---|
+| **Appearance prediction** | `predict/appearance` · `predict` | would a product appear for a term — verdict, confidence, why, fix path |
 | Feed audit + coverage/gap + simulated lift | `feed/analyzer` · `analyze` | the core report |
 | **LLM feed copywriting** (closes the loop) | `generate/feed-generator` · `generate` | rewrites titles/descriptions (LLM or offline template) to fill the gaps |
 | **Price competitiveness** | `pricing/price-intel` | flags items priced above market (a major ranking factor) |
