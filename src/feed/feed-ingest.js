@@ -29,24 +29,83 @@ export function ingestFeed(input, taxonomy = null) {
   }));
 }
 
-/** Detect JSON vs TSV and parse to an array of plain objects. */
+/** Detect the format (JSON / XML-RSS / CSV / TSV) and parse to plain objects. */
 function parseFeedString(text) {
   const trimmed = String(text).trim();
   if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
     const parsed = JSON.parse(trimmed);
     return Array.isArray(parsed) ? parsed : [parsed];
   }
-  // TSV
-  const lines = trimmed.split(/\r?\n/).filter(Boolean);
-  const headers = lines[0].split('\t').map((h) => h.trim());
+  if (trimmed.startsWith('<')) return parseXmlFeed(trimmed);
+
+  // Delimited text: detect comma (CSV) vs tab (TSV) from the header row.
+  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? '';
+  const delim = firstLine.includes('\t') ? '\t' : ',';
+  return parseDelimited(trimmed, delim);
+}
+
+/** Parse a Google RSS/Atom product feed (no XML dependency). */
+function parseXmlFeed(xml) {
+  const blocks = xml.match(/<(item|entry)\b[\s\S]*?<\/\1>/gi) ?? [];
+  return blocks.map((block) => {
+    // Strip the outer <item>/<entry> wrapper so it isn't matched as a field.
+    const inner = block
+      .replace(/^<(item|entry)\b[^>]*>/i, '')
+      .replace(/<\/(item|entry)>\s*$/i, '');
+    const obj = {};
+    const tagRe = /<(?:[\w]+:)?([\w-]+)(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w]+:)?\1>/g;
+    let m;
+    while ((m = tagRe.exec(inner)) !== null) {
+      const key = m[1].toLowerCase();
+      const value = decodeXml(stripCdata(m[2])).trim();
+      // First non-empty wins (handles e.g. both <title> and <g:title>).
+      if (value && obj[key] == null) obj[key] = value;
+    }
+    return obj;
+  });
+}
+
+/** Parse comma/tab-delimited text with quoted-field support. */
+function parseDelimited(text, delim) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (!lines.length) return [];
+  const headers = splitDelimited(lines[0], delim).map((h) => h.trim());
   return lines.slice(1).map((line) => {
-    const cells = line.split('\t');
+    const cells = splitDelimited(line, delim);
     const obj = {};
     headers.forEach((h, i) => {
-      if (cells[i] != null && cells[i] !== '') obj[h] = cells[i];
+      const v = cells[i];
+      if (v != null && String(v).trim() !== '') obj[h] = String(v).trim();
     });
     return obj;
   });
+}
+
+function splitDelimited(line, delim) {
+  if (delim === '\t') return line.split('\t');
+  const out = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === delim && !inQ) { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+function stripCdata(s) {
+  return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+}
+
+function decodeXml(s) {
+  return s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 }
 
 /** Which meaningful feed fields the merchant actually supplied. */

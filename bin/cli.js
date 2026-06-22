@@ -35,6 +35,7 @@ import {
   CHANNELS, exportForChannel, missingRequiredFields, toTSV,
   snapshot, diffSnapshots, detectAlerts,
   auditProduct, optimizeProduct, predictAppearance, runWarmed,
+  extractProductFromHtml, scanProduct,
 } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -633,6 +634,56 @@ async function cmdEmbed(positional, flags) {
   }
 }
 
+async function cmdScan(positional, flags) {
+  const src = positional[0];
+  if (!src) return fail('scan needs a PDP URL or HTML file: scan https://store.com/p/123  (or scan page.html)');
+
+  let html;
+  if (/^https?:\/\//i.test(src)) {
+    try {
+      const res = await fetch(src, { headers: { 'user-agent': 'Mozilla/5.0 ShopGraphBot' } });
+      if (!res.ok) return fail(`fetch ${src} → HTTP ${res.status}`);
+      html = await res.text();
+    } catch (e) {
+      return fail(`could not fetch ${src}: ${e.message}`);
+    }
+  } else {
+    html = readFileSync(src, 'utf8');
+  }
+
+  const useNeural = !!flags.neural;
+  const baseSys = useNeural ? (await buildNeuralSystem()).sys : createShoppingSystem();
+  const taxonomy = baseSys.taxonomy;
+
+  const extracted = extractProductFromHtml(html, { url: /^https?:/i.test(src) ? src : undefined });
+  if (!extracted.title) return fail('could not extract a product from that page (no JSON-LD / OpenGraph / title found)');
+
+  const run = (sys) => {
+    const stored = sys.engine.index({ ...extracted });
+    return scanProduct({ engine: sys.engine, product: stored, taxonomy: sys.taxonomy });
+  };
+  const out = useNeural
+    ? await runWarmed({ inner: baseSys.embedder, taxonomy, run })
+    : run(baseSys);
+
+  const cat = out.product.categoryId != null ? taxonomy.get(out.product.categoryId) : null;
+  console.log('='.repeat(72));
+  console.log(' PDP scan — appearance potential');
+  console.log('='.repeat(72));
+  console.log(`Product: ${out.product.title}`);
+  console.log(`Brand: ${out.product.brand ?? '—'} · Price: ${money(out.product.price)} · ` +
+    `${out.product.inStock ? 'in stock' : 'OUT OF STOCK'}`);
+  console.log(`Inferred category: ${cat ? `[${cat.id}] ${cat.path}` : '(none)'}`);
+  if (!out.eligible) console.log(`⚠ Ineligible to serve: ${out.eligibilityIssues.join(', ')}`);
+  console.log('\nSearches this product could target — and how likely it is to appear:');
+  console.log('─'.repeat(72));
+  const icon = { likely: '🟢', possible: '🟡', unlikely: '🔴', ineligible: '⚫' };
+  for (const q of out.queries) {
+    console.log(`  ${icon[q.verdict] || ' '} ${String(Math.round(q.likelihood * 100) + '%').padStart(4)}  ${q.verdict.padEnd(9)} "${q.query}"`);
+  }
+  console.log('\n🟢 likely (≥ bar) · 🟡 possible (near bar) · 🔴 unlikely.  Add --neural for the real model.');
+}
+
 function fail(msg) {
   console.error(`error: ${msg}`);
   process.exitCode = 1;
@@ -653,6 +704,7 @@ Usage:
   shopping-graph index [<file.json>]
   shopping-graph embed ["text" ...] [--provider neural|local|remote]   (free real model)
   shopping-graph search "<query>" [--neural]   (use the free in-process model)
+  shopping-graph scan <pdp-url | page.html> [--neural]   (infer target searches + likelihood)
   shopping-graph predict "<search term>" [--data feed.json] [--product id] [--threshold N] [--neural]
   shopping-graph analyze [<feed.json>] [--search-terms <terms.csv>] [--html <out.html>] [--neural]
   shopping-graph generate [<feed.json>] [--provider llm|template] [--out optimized.json]
@@ -677,6 +729,7 @@ async function main() {
     case 'index': return cmdIndex(positional, flags);
     case 'analyze': return cmdAnalyze(positional, flags);
     case 'predict': return cmdPredict(positional, flags);
+    case 'scan': return cmdScan(positional, flags);
     case 'generate': return cmdGenerate(positional, flags);
     case 'compete': return cmdCompete(positional, flags);
     case 'channels': return cmdChannels(positional, flags);

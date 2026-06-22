@@ -19,6 +19,7 @@ sample data. The embedding provider is pluggable, so a real model
 
 ```bash
 node bin/cli.js predict "waterproof hiking boots"  # ← would each product appear, and why?
+node bin/cli.js scan data/sample-pdp.html          # ← scan a PDP: infer target searches + likelihood
 node bin/cli.js predict "warm winter coat" --product SKU-1001   # detailed single-product verdict
 node bin/cli.js analyze data/feed.sample.json \
   --search-terms data/search-terms.sample.csv \
@@ -74,6 +75,8 @@ Google — treat the probability as directional.
 | Capability | Module / command | What it adds |
 |---|---|---|
 | **Appearance prediction** | `predict/appearance` · `predict` | would a product appear for a term — verdict, confidence, why, fix path |
+| **PDP scan** | `predict/pdp` · `scan` | point at a product page (URL/HTML) → extract it, infer the searches it should target, score appearance likelihood |
+| **Feed ingestion** | `feed/feed-ingest` | reads Merchant Center feeds as XML/RSS, CSV, TSV, or JSON |
 | Feed audit + coverage/gap + simulated lift | `feed/analyzer` · `analyze` | the core report |
 | **LLM feed copywriting** (closes the loop) | `generate/feed-generator` · `generate` | rewrites titles/descriptions (LLM or offline template) to fill the gaps |
 | **Price competitiveness** | `pricing/price-intel` | flags items priced above market (a major ranking factor) |
