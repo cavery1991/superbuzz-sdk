@@ -3,14 +3,15 @@
  * "<id> - <full > path>" line format.
  *
  * This is an illustrative slice (apparel, shoes, outerwear, electronics, sporting
- * goods) chosen so the bundled demos run offline. For production, download the
- * full ~6,000-category file from Google and load it with `Taxonomy.fromFile(...)`:
+ * goods, health & beauty) chosen so the bundled demos run offline. For production,
+ * download the full ~6,000-category file from Google and load it with
+ * `Taxonomy.fromFile(...)`:
  *
  *   https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
  *
  * The ids below follow Google's taxonomy where known; a few leaf ids are
- * illustrative so the documented examples (Athletic Shoes = 187, warm winter
- * coats) resolve cleanly.
+ * illustrative so the documented examples resolve cleanly. Merchant Center also
+ * accepts the full category path string as google_product_category.
  */
 export const SAMPLE_TAXONOMY = `# Google_Product_Taxonomy (curated subset)
 166 - Apparel & Accessories
@@ -38,4 +39,22 @@ export const SAMPLE_TAXONOMY = `# Google_Product_Taxonomy (curated subset)
 536 - Home & Garden
 604 - Home & Garden > Kitchen & Dining
 668 - Home & Garden > Kitchen & Dining > Cookware
+436 - Home & Garden > Furniture
+469 - Health & Beauty
+484 - Health & Beauty > Personal Care
+2915 - Health & Beauty > Personal Care > Cosmetics
+2619 - Health & Beauty > Personal Care > Cosmetics > Makeup
+2779 - Health & Beauty > Personal Care > Cosmetics > Makeup > Eye Makeup
+7362 - Health & Beauty > Personal Care > Cosmetics > Makeup > Eye Makeup > Eyebrow Enhancers
+8206 - Health & Beauty > Personal Care > Cosmetics > Makeup > Face Makeup
+2775 - Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup
+2779001 - Health & Beauty > Personal Care > Cosmetics > Makeup > Nail Polish
+567 - Health & Beauty > Personal Care > Cosmetics > Skin Care
+2526 - Health & Beauty > Personal Care > Cosmetics > Skin Care > Moisturizers
+2544 - Health & Beauty > Personal Care > Hair Care
+2559 - Health & Beauty > Personal Care > Cosmetics > Perfume & Cologne
+537 - Baby & Toddler
+1239 - Toys & Games
+922 - Office Supplies
+412 - Food, Beverages & Tobacco
 `;

@@ -44,6 +44,16 @@ export const CONCEPTS = {
   cookware: ['cookware', 'pan', 'pot', 'skillet', 'saucepan', 'wok', 'frypan'],
   nonstick: ['nonstick', 'ceramic', 'teflon', 'coated'],
 
+  // --- Health & Beauty ----------------------------------------------------
+  cosmetics: ['cosmetic', 'cosmetics', 'makeup', 'beauty'],
+  makeup: ['makeup', 'lipstick', 'lip', 'gloss', 'mascara', 'eyeliner', 'foundation', 'concealer', 'blush', 'bronzer', 'eyeshadow', 'highlighter'],
+  eye_makeup: ['eyebrow', 'brow', 'eyeliner', 'eyeshadow', 'mascara', 'lash', 'eye'],
+  brow: ['brow', 'eyebrow', 'sculpt', 'gel', 'wax'],
+  skincare: ['skincare', 'serum', 'moisturizer', 'moisturiser', 'cleanser', 'toner', 'cream', 'lotion', 'spf', 'sunscreen', 'exfoliant'],
+  haircare: ['shampoo', 'conditioner', 'haircare', 'hairspray', 'pomade'],
+  fragrance: ['perfume', 'cologne', 'fragrance', 'eau', 'parfum'],
+  nailcare: ['nail', 'polish', 'lacquer', 'manicure'],
+
   // --- Generic attributes -------------------------------------------------
   lightweight: ['lightweight', 'light', 'ultralight', 'featherweight'],
   durable: ['durable', 'rugged', 'tough', 'heavy', 'duty', 'sturdy'],

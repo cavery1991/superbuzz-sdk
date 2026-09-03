@@ -37,8 +37,10 @@ export function optimizeProduct({ raw, product, audit, taxonomy, derivedTags = [
     if (target != null) {
       suggestedCategoryId = target;
       const node = taxonomy.get(target);
+      // Merchant Center accepts the full category path as the value, so recommend
+      // the path (id shown as a hint) — safer than a possibly-approximate id.
       recommendations.push(rec('set_gpc', 'high',
-        `Set google_product_category to [${target}] ${node ? node.path : ''}.`));
+        node ? `Set google_product_category to "${node.path}".` : 'Set a google_product_category.'));
     }
   }
 

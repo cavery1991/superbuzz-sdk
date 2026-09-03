@@ -50,9 +50,15 @@ export class CategoryClassifier {
     return scored.slice(0, topK);
   }
 
-  /** Best single category id (or null if nothing scores above 0). */
-  bestCategoryId(text) {
+  /**
+   * Best single category id, or null when nothing matches confidently.
+   * The floor matters: without it, an out-of-domain product (e.g. a cosmetic in
+   * a catalog whose taxonomy lacks beauty) gets forced into the least-bad — and
+   * absurd — category. Returning null instead lets callers say "no category"
+   * rather than suggest nonsense.
+   */
+  bestCategoryId(text, minConfidence = 0.12) {
     const [top] = this.classify(text, 1);
-    return top && top.score > 0 ? top.id : null;
+    return top && top.score >= minConfidence ? top.id : null;
   }
 }
